@@ -133,6 +133,15 @@ function leaderCommand(world: World, u: Unit, cmd: 'rally' | 'tax' | 'war' | 'pe
       if (!other || other === u.team) { info(world, `${u.name}: !${cmd} red / blue / yellow / green`, u.team); return; }
       t.atWarWith = cmd === 'war' ? [other, ...t.atWarWith.filter((x) => x !== other)] : t.atWarWith.filter((x) => x !== other);
       if (cmd === 'war') t.lastRaidTick = -1e9;
+      else {
+        // peace is mutual: both sides stop their raids and call back fighters already on the way
+        const o = world.teams[other];
+        o.atWarWith = o.atWarWith.filter((x) => x !== u.team);
+        t.lastRaidTick = o.lastRaidTick = world.tick;
+        for (const x of world.units) {
+          if (x.alive && x.job.kind === 'attack' && ((x.team === u.team && x.job.team === other) || (x.team === other && x.job.team === u.team))) { x.job = { kind: 'idle' }; x.path = undefined; }
+        }
+      }
       emit(world, { kind: 'info', team: u.team, text: cmd === 'war' ? `${u.team.toUpperCase()} DECLARES WAR ON ${other.toUpperCase()}!` : `${u.team} makes peace with ${other}` });
       return;
   }

@@ -65,7 +65,8 @@ export function createHud(ui: HTMLElement) {
     showcase.classList.remove('pop');
     void showcase.offsetWidth; // restart the pop animation
     showcase.classList.add('pop');
-    setTimeout(next, item.big ? 6000 : 4000);
+    // shorter while more gifts wait, so the banner keeps pace with what happens on the map
+    setTimeout(next, queue.length ? 2500 : item.big ? 6000 : 4000);
   };
   const feed = el('div', 'feed', bottom);
 
@@ -107,6 +108,7 @@ export function createHud(ui: HTMLElement) {
         if (e.kind === 'roundEnd') showBoard(world);
         if (e.kind === 'god' || e.kind === 'leader') {
           queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' });
+          if (queue.length > 2) queue.shift(); // gift storm: skip the oldest so the banner never lags far behind
           if (!showing) next();
         }
       }

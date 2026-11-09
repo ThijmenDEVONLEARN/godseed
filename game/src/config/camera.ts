@@ -6,6 +6,9 @@ export const CAMERA = {
   fightRadius: 8,
   easeMs: 600,
   giftHoldAfterMs: 12_000, // stays this long after a gift event ends (10–15 s)
+  giftMaxMs: 15_000, // long effects (titan walk) are followed at most this long, then the hold starts
+  giftBusyMs: 5_000, // with more gifts waiting, each one is shown this long
+  giftQueueMax: 2, // waiting gifts beyond this are skipped (oldest first)
   eventHoldMs: 6_000, // a fight stays in view this long after its last hit
   eventMergeTiles: 10, // new events this close extend the current one
   joinMs: 3_000,

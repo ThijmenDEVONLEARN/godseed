@@ -98,4 +98,19 @@ describe('chief', () => {
     sim.step();
     expect(sim.world.teams.red.atWarWith).toEqual(['blue']);
   });
+
+  it('peace is mutual and calls back fighters on both sides', () => {
+    const sim = grown();
+    sim.enqueue({ kind: 'gift', viewerId: 'g', name: 'Gina', coins: 199, giftId: 0 });
+    sim.step();
+    const w = sim.world;
+    w.teams.blue.atWarWith = ['red'];
+    const blue = w.units.find((u) => u.alive && u.team === 'blue')!;
+    const redTarget = w.units.find((u) => u.alive && u.team === 'red')!;
+    blue.job = { kind: 'attack', team: 'red', targetId: redTarget.id, targetIsUnit: true };
+    sim.enqueue({ kind: 'leaderCmd', viewerId: 'g', cmd: 'peace', team: 'blue' });
+    sim.step();
+    expect(w.teams.blue.atWarWith).toEqual([]);
+    expect(blue.job.kind).not.toBe('attack');
+  });
 });

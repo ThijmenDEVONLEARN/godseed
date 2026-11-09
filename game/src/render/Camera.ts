@@ -6,7 +6,7 @@ import type { ActiveEffect, SimEvent, World } from '../sim/types';
 enum Prio { Gift = 1, Event = 2, Join = 3, Tour = 4, None = 9 }
 /** What to keep in frame: one unit, a moving god effect, or the brawl around the spot. */
 export type Track = { unitId: number } | { effect: ActiveEffect['kind'] } | { fight: true };
-interface Focus { prio: Prio; x: number; y: number; until: number; track?: Track }
+interface Focus { prio: Prio; x: number; y: number; until: number; track?: Track; /** a waiting gift may take over after this */ busyUntil?: number }
 /** Smooth (interpolated) tile position of a unit, from the renderer. */
 export type Locate = (unitId: number) => { x: number; y: number } | undefined;
 export interface CameraTarget { x: number; y: number; zoom: number }
@@ -26,13 +26,21 @@ export function createCamera(mapW: number, mapH: number) {
   const current = { x: mapW / 2, y: mapH / 2, zoom: 1 };
 
   const set = (prio: Prio, x: number, y: number, until: number, track?: Track) => { focus = { prio, x, y, until, track }; lastAction = until; };
+  const showGift = (x: number, y: number, ms: number, now: number, track?: Track) => {
+    const effect = Math.min(ms, CAMERA.giftMaxMs);
+    set(Prio.Gift, x, y, now + effect + CAMERA.giftHoldAfterMs, track);
+    focus.busyUntil = now + Math.min(effect, CAMERA.giftBusyMs);
+  };
   const free = (now: number) => focus.prio === Prio.None || now > focus.until;
 
   return {
     /** A gift effect at (x, y) lasting `ms`; queued behind a running gift event. */
     gift(x: number, y: number, ms: number, now: number, track?: Track): void {
-      if (focus.prio === Prio.Gift && now <= focus.until) gifts.push({ x, y, ms, track });
-      else set(Prio.Gift, x, y, now + ms + CAMERA.giftHoldAfterMs, track);
+      if (focus.prio === Prio.Gift && now <= focus.until) {
+        gifts.push({ x, y, ms, track });
+        // a gift storm: keep only the newest few so the camera never lags far behind chat
+        if (gifts.length > CAMERA.giftQueueMax) gifts.shift();
+      } else showGift(x, y, ms, now, track);
     },
 
     events(events: SimEvent[], now: number): void {
@@ -54,9 +62,10 @@ export function createCamera(mapW: number, mapH: number) {
 
     /** Where to look this frame (eased). */
     update(world: World, now: number, dtMs: number, locate: Locate = (id) => world.units.find((u) => u.id === id && u.alive)): CameraTarget {
-      if (now > focus.until) {
+      const giftWaiting = gifts.length > 0 && focus.prio === Prio.Gift && now > (focus.busyUntil ?? 0);
+      if (now > focus.until || giftWaiting) {
         const next = gifts.shift();
-        if (next) set(Prio.Gift, next.x, next.y, now + next.ms + CAMERA.giftHoldAfterMs, next.track);
+        if (next) showGift(next.x, next.y, next.ms, now, next.track);
         else if (focus.prio !== Prio.None) focus = { prio: Prio.None, x: mapW / 2, y: mapH / 2, until: 0 };
       }
       if (focus.prio === Prio.None && now - lastAction > CAMERA.tourEveryMs) {

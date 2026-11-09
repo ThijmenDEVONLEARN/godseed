@@ -119,6 +119,8 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
       const around = effect === 'eclipse' ? { x: cx, y: cy } : { x: eh.homeX, y: eh.homeY };
       for (let i = 0; i < n; i++) { const p = landNear(world, around.x, around.y, effect === 'eclipse' ? 20 : 7); if (p) spawnAnimal(world, 'wolf', ...p); }
       at = around; ticks = 100;
+      // render-only markers: the eclipse darkens the sky, the flood shows water over the village
+      if (effect === 'eclipse') world.effects.push({ kind: 'eclipse', team, until: world.tick + 200, x: cx, y: cy, dx: 0, dy: 0, byName });
       break;
     }
     case 'hero': {
@@ -149,6 +151,7 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
       eh.stock.food = Math.floor(eh.stock.food / 2);
       for (const u of aliveUnitsOf(world, enemy)) if (world.tiles[idx(world.w, u.x, u.y)] === Tile.Sand || world.tiles[idx(world.w, u.x, u.y)] === Tile.Farmland) damageUnit(world, u, 20, undefined, 'was swept away');
       at = { x: eh.homeX, y: eh.homeY }; ticks = 60;
+      world.effects.push({ kind: 'flood', team: enemy, until: world.tick + 150, x: eh.homeX, y: eh.homeY, dx: 0, dy: 0, byName });
       break;
     }
     case 'rainOfGold': for (const t of TEAMS) world.teams[t].stock.gold += G.rainOfGold; at = { x: cx, y: cy }; break;

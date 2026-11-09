@@ -20,6 +20,7 @@ export interface CommandSinks {
 export function createCommandRouter(sim: Simulation, out: CommandSinks) {
   const cooldown = createCooldown();
   const welcomed = new Set<string>();
+  const warned = new Set<string>(); // viewers already told to wait during their current cooldown
   let likes = 0;
   return (e: ViewerEvent, now = Date.now()): void => {
     const w = sim.world;
@@ -33,7 +34,12 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
         if ('vote' in parsed) { out.vote(e.viewer.id, parsed.vote); return; }
         if (parsed.sim.kind !== 'join') {
           const wait = cooldown(e.viewer.id, now);
-          if (wait) { out.feed(`${unit?.name ?? e.viewer.name}: wait ${wait}s`, unit?.team); return; }
+          if (wait) {
+            if (!warned.has(e.viewer.id)) out.feed(`${unit?.name ?? e.viewer.name}: wait ${wait}s`, unit?.team);
+            warned.add(e.viewer.id);
+            return;
+          }
+          warned.delete(e.viewer.id);
           if (unit?.alive) out.say(unit.id, e.text.trim().slice(0, 30));
         }
         sim.enqueue(parsed.sim);

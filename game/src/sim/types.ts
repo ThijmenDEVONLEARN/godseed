@@ -120,7 +120,7 @@ export interface RoundState {
 }
 
 export interface ActiveEffect {
-  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan';
+  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood';
   team: Team;
   until: number;
   x: number;

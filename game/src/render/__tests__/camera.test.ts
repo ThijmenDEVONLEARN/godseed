@@ -26,6 +26,18 @@ describe('camera rules', () => {
     expect(cam.prio).not.toBe('Gift');
   });
 
+  it('a gift storm keeps up: newest gifts shown 5 s each, older ones skipped', () => {
+    const cam = createCamera(64, 72);
+    for (let i = 0; i < 5; i++) cam.gift(10 + i, 10, 30_000, i * 100);
+    cam.update(world, 600, 16);
+    cam.update(world, 5_200, 16); // first gift had 5 s, the next waiting one (oldest kept) takes over
+    cam.update(world, 10_400, 16);
+    cam.update(world, 15_600, 16); // queue empty: last gift holds its (capped) effect time plus 12 s
+    expect(cam.prio).toBe('Gift');
+    cam.update(world, 10_400 + 15_000 + 12_000 + 100, 16);
+    expect(cam.prio).not.toBe('Gift');
+  });
+
   it('a join zooms for 3 s when nothing happens, but not during join spam', () => {
     const cam = createCamera(64, 72);
     cam.events([ev('join', 10, 10)], 0);

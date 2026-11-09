@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { Animal, Building, Mover, Unit, World } from '../sim/types';
+import { Tile } from '../sim/types';
 import { T, drawTile, type Art } from './art';
 import { PALETTE } from './palette';
 
@@ -73,6 +74,20 @@ export class WorldView {
 
   private syncRain(world: World, now: number): void {
     this.rain.clear();
+    for (const e of world.effects) {
+      const fade = Math.min(1, (e.until - now) / 20); // ease out over the last 2 s
+      if (e.kind === 'eclipse') this.rain.rect(0, 0, world.w * T, world.h * T).fill({ color: '#0a0820', alpha: 0.65 * fade });
+      if (e.kind === 'flood') {
+        // water over low ground around the flooded village, gently rippling
+        for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
+          const x = e.x + dx, y = e.y + dy;
+          if (dx * dx + dy * dy > 49 || x < 0 || y < 0 || x >= world.w || y >= world.h) continue;
+          const t = world.tiles[y * world.w + x];
+          if (t !== Tile.Grass && t !== Tile.Sand && t !== Tile.Farmland && t !== Tile.Burnt) continue;
+          this.rain.rect(x * T, y * T, T, T).fill({ color: (x + y + Math.floor(now / 4)) % 3 ? '#3f8fd8' : '#6fb3ee', alpha: 0.7 * fade });
+        }
+      }
+    }
     if (world.tick >= world.rainUntil) return;
     const w = world.w * T, h = world.h * T;
     for (let i = 0; i < 260; i++) {
