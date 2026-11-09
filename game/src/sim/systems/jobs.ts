@@ -77,12 +77,13 @@ function deliver(world: World, u: Unit): void {
   u.job = { kind: 'idle' };
 }
 
-/** Runs each unit's job state machine. Viewer units only act on their own orders. */
+/** Runs each unit's job state machine. */
 export function jobs(world: World, walls: Map<number, Team>): void {
   const unitsById = new Map(world.units.map((x) => [x.id, x]));
   for (const u of world.units) {
     if (!u.alive || !ready(world, u)) continue;
-    if (u.job.kind === 'idle' && !u.viewerId) chooseJob(world, u);
+    // viewer units work like villagers until their own commands arrive (phase 2)
+    if (u.job.kind === 'idle') chooseJob(world, u);
     const job = u.job;
     switch (job.kind) {
       case 'gather': {

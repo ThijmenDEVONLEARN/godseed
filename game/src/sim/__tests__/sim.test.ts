@@ -66,3 +66,14 @@ describe('simulation', () => {
     expect(sim.world.units.length).toBe(TEAMS.length * BALANCE.startNpcs);
   });
 });
+
+describe('viewer units', () => {
+  it('get to work instead of standing still', () => {
+    const sim = createSimulation(5);
+    sim.enqueue({ kind: 'join', viewerId: 'w', name: 'Wim', team: 'green' });
+    for (let i = 0; i < 100; i++) sim.step();
+    const u = sim.world.units.find((x) => x.viewerId === 'w')!;
+    expect(u.job.kind).not.toBe('idle');
+    expect(u.x !== sim.world.teams.green.homeX || u.y !== sim.world.teams.green.homeY).toBe(true);
+  });
+});
