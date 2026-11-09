@@ -87,6 +87,8 @@ export interface TeamState {
   faith: number;
   kills: number;
   disastersSurvived: number;
+  /** Chief !tax works again from this tick. */
+  taxReadyTick?: number;
   atWarWith: Team[];
   lastThreatTick: number;
   /** Resources the team brain wants gathered, most needed first. */

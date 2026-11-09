@@ -7,6 +7,7 @@ import { reachable } from './worldgen/generate';
 import { damageBuilding, damageUnit } from './systems/combat';
 import { ignite, igniteTile } from './systems/fire';
 import { newVillager } from './systems/population';
+import { STORM, survived } from './systems/round';
 import { Deposit, Tile, type ActiveEffect, type Unit, type World } from './types';
 
 const G = BALANCE.god;
@@ -204,6 +205,8 @@ function volcano(world: World): { x: number; y: number } {
   return { x: cx, y: cy };
 }
 
+const DISASTERS = new Set<ActiveEffect['kind']>(['dragon', 'tornado', 'plague', 'flood']);
+
 /** Timed effects, heroes and rain, once per tick. */
 export function godTick(world: World): void {
   for (const e of world.effects) {
@@ -235,6 +238,11 @@ export function godTick(world: World): void {
         break;
       case 'goldenAge': break; // read by deliver()
     }
+  }
+  for (const e of world.effects) {
+    if (world.tick < e.until || e.byName === STORM || !DISASTERS.has(e.kind) || !survived(world, e.team)) continue;
+    world.teams[e.team].disastersSurvived++;
+    emit(world, { kind: 'info', team: e.team, text: `${cap(e.team)} survived the ${e.kind}! +${BALANCE.round.score.disaster}` });
   }
   world.effects = world.effects.filter((e) => world.tick < e.until);
   for (const u of world.units) if (u.alive && u.role === 'hero') {

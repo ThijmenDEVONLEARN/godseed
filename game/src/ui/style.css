@@ -39,3 +39,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .showcase.big.pop { animation: pop .35s ease-out, shake .5s .35s 3; }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-8px, 4px); } 75% { transform: translate(8px, -4px); } }
+
+/* Final Storm: red glow around the map zone (from y 230 to the command panel) */
+.vignette { position: absolute; top: 230px; left: 0; right: 0; height: 1162px; box-shadow: inset 0 0 140px 40px rgba(255, 40, 40, .55); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .6; } }

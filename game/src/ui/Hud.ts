@@ -55,6 +55,8 @@ export function createHud(ui: HTMLElement) {
     el('span', '', row, label);
   }
   const social = el('div', 'social', bottom, GIFTS.social.join('   ·   '));
+  const vignette = el('div', 'vignette', ui);
+  vignette.hidden = true;
   const showcase = el('div', 'showcase', ui);
   showcase.hidden = true;
   const queue: { text: string; team?: Team; big: boolean }[] = [];
@@ -97,6 +99,7 @@ export function createHud(ui: HTMLElement) {
       const left = r.startTick + BALANCE.round.roundTicks - world.tick;
       time.textContent = r.phase === 'scoreboard' ? 'ROUND OVER' : clock(left);
       time.classList.toggle('storm', r.phase === 'storm');
+      vignette.hidden = r.phase !== 'storm';
       const v = world.vote;
       sub.classList.toggle('vote', !!v);
       if (v) {
@@ -111,8 +114,8 @@ export function createHud(ui: HTMLElement) {
         if (!FEED_KINDS.has(e.kind) || (e.kind === 'storm' && e.x !== undefined)) continue;
         line(e.text, e.team);
         if (e.kind === 'roundEnd') showBoard(world);
-        if (e.kind === 'god' || e.kind === 'leader') {
-          queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' });
+        if (e.kind === 'god' || e.kind === 'leader' || (e.kind === 'storm' && e.x === undefined)) {
+          queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' || e.kind === 'storm' });
           if (queue.length > 2) queue.shift(); // gift storm: skip the oldest so the banner never lags far behind
           if (!showing) next();
         }

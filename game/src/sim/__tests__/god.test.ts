@@ -113,4 +113,28 @@ describe('chief', () => {
     expect(w.teams.blue.atWarWith).toEqual([]);
     expect(blue.job.kind).not.toBe('attack');
   });
+
+  it('!tax has a 2 minute cooldown', () => {
+    const sim = grown();
+    sim.enqueue({ kind: 'gift', viewerId: 'g', name: 'Gina', coins: 199, giftId: 0 });
+    sim.step();
+    sim.world.teams.red.stock.food = 100;
+    sim.enqueue({ kind: 'leaderCmd', viewerId: 'g', cmd: 'tax' });
+    sim.step();
+    sim.enqueue({ kind: 'leaderCmd', viewerId: 'g', cmd: 'tax' });
+    expect(sim.step().some((e) => e.text.includes('taxed recently'))).toBe(true);
+  });
+});
+
+describe('survived disasters (A8)', () => {
+  it('a tribe that still has a building after a disaster scores it', () => {
+    const sim = grown();
+    const before = sim.world.teams.blue.disastersSurvived;
+    applyGod(sim.world, 'plague', 'red', 'Gina');
+    const plague = sim.world.effects.find((e) => e.kind === 'plague')!;
+    plague.until = sim.world.tick + 1;
+    const ev = [sim.step(), sim.step()].flat();
+    expect(sim.world.teams[plague.team].disastersSurvived).toBe(plague.team === 'blue' ? before + 1 : 1);
+    expect(ev.some((e) => e.text.includes('survived the plague'))).toBe(true);
+  });
 });

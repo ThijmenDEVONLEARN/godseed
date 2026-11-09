@@ -103,10 +103,11 @@ app.ticker.add((t) => {
   debug.set(`fps ${app.ticker.FPS.toFixed(0)} · seed ${sim.world.seed} · units ${sim.world.units.filter((u) => u.alive).length} · cam ${camera.prio}`);
 });
 
-// dev keys: R new world, J fake viewer joins, G random gift (the test panel at /panel.html does the rest)
+// dev keys: R new world, J fake viewer joins, G random gift, S start the Final Storm (the test panel at /panel.html does the rest)
 let fakes = 0;
 window.addEventListener('keydown', (e) => {
   if (e.key === 'r') location.search = `?seed=${Math.floor(Math.random() * 1e9)}`;
   if (e.key === 'g') route({ type: 'gift', viewer: { id: `fake${fakes}`, name: `viewer_${fakes}` }, giftId: 0, giftName: 'Test', coins: [1, 5, 20, 50, 199, 200, 500][Math.floor(Math.random() * 7)], repeat: 1, ts: Date.now() });
   if (e.key === 'j') route({ type: 'chat', viewer: { id: `fake${++fakes}`, name: `viewer_${fakes}` }, text: `!join ${TEAMS[fakes % TEAMS.length]}`, ts: Date.now() });
+  if (e.key === 's' && sim.world.round.phase === 'play') sim.world.round.phaseUntil = sim.world.tick; // dev: start the Final Storm now
 });

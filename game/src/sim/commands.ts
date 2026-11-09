@@ -116,6 +116,9 @@ function join(world: World, viewerId: string, name: string, wanted?: Team): void
   emit(world, { kind: 'join', team, x: t.homeX, y: t.homeY, unitId: u.id, text: `${name} joined ${team}` });
 }
 
+const TAX_COOLDOWN_TICKS = 1200; // 2 min
+const PEACE_EXTRA_TICKS = 1500; // on top of the normal raid interval
+
 function leaderCommand(world: World, u: Unit, cmd: 'rally' | 'tax' | 'war' | 'peace', other?: Team): void {
   if (world.leaders[u.team] !== u.id || u.role !== 'leader') { info(world, `${u.name}: only the chief can do that (gift 199 coins)`, u.team); return; }
   const t = world.teams[u.team];
@@ -125,7 +128,9 @@ function leaderCommand(world: World, u: Unit, cmd: 'rally' | 'tax' | 'war' | 'pe
       emit(world, { kind: 'info', team: u.team, text: `Chief ${u.name} rallies ${u.team}!` });
       return;
     case 'tax':
+      if (world.tick < (t.taxReadyTick ?? 0)) { info(world, `${u.name}: the people were taxed recently`, u.team); return; }
       if (t.stock.food < 5) { info(world, `${u.name}: not enough food to tax`, u.team); return; }
+      t.taxReadyTick = world.tick + TAX_COOLDOWN_TICKS;
       t.stock.food -= 5; t.stock.gold += 5;
       emit(world, { kind: 'info', team: u.team, text: `Chief ${u.name} taxed the people: +5 gold` });
       return;
@@ -137,7 +142,7 @@ function leaderCommand(world: World, u: Unit, cmd: 'rally' | 'tax' | 'war' | 'pe
         // peace is mutual: both sides stop their raids and call back fighters already on the way
         const o = world.teams[other];
         o.atWarWith = o.atWarWith.filter((x) => x !== u.team);
-        t.lastRaidTick = o.lastRaidTick = world.tick;
+        t.lastRaidTick = o.lastRaidTick = world.tick + PEACE_EXTRA_TICKS; // both tribes stay defensive for ~5 min
         for (const x of world.units) {
           if (x.alive && x.job.kind === 'attack' && ((x.team === u.team && x.job.team === other) || (x.team === other && x.job.team === u.team))) { x.job = { kind: 'idle' }; x.path = undefined; }
         }
