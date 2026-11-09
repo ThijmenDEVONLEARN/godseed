@@ -1,0 +1,4 @@
+packages:
+  - game
+  - bridge
+  - shared
