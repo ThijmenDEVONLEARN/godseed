@@ -110,5 +110,9 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'r') location.search = `?seed=${Math.floor(Math.random() * 1e9)}`;
   if (e.key === 'g') route({ type: 'gift', viewer: { id: `fake${fakes}`, name: `viewer_${fakes}` }, giftId: 0, giftName: 'Test', coins: [1, 5, 20, 50, 199, 200, 500][Math.floor(Math.random() * 7)], repeat: 1, ts: Date.now() });
   if (e.key === 'j') route({ type: 'chat', viewer: { id: `fake${++fakes}`, name: `viewer_${fakes}` }, text: `!join ${TEAMS[fakes % TEAMS.length]}`, ts: Date.now() });
-  if (e.key === 's' && sim.world.round.phase === 'play') sim.world.round.phaseUntil = sim.world.tick; // dev: start the Final Storm now
+  if (e.key === 's' && sim.world.round.phase === 'play') {
+    // dev: jump to the real storm window, so it lasts the normal 10 minutes
+    sim.world.round.startTick = sim.world.tick - (BALANCE.round.roundTicks - BALANCE.round.stormTicks);
+    sim.world.round.phaseUntil = sim.world.tick;
+  }
 });

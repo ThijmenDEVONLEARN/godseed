@@ -234,7 +234,7 @@ export function godTick(world: World): void {
         break;
       }
       case 'plague':
-        if (world.tick % G.plagueEvery === 0) for (const u of world.units) if (u.alive && u.team === e.team && u.id % 2 === world.tick % 2) damageUnit(world, u, 1, undefined, 'died of the plague');
+        if (world.tick % G.plagueEvery === 0) for (const u of world.units) if (u.alive && u.team === e.team && u.id % 2 === (world.tick / G.plagueEvery) % 2) damageUnit(world, u, 1, undefined, 'died of the plague');
         break;
       case 'goldenAge': break; // read by deliver()
     }

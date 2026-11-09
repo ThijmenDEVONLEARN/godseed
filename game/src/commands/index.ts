@@ -52,7 +52,8 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
         return;
       case 'follow': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'baby' }); return;
       case 'share': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'goldChest' }); return;
-      case 'gift': sim.enqueue({ kind: 'gift', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), coins: e.coins, giftId: e.giftId }); return;
+      // a streak (repeat > 1) counts its full value; the chief gift is matched by giftId, or by a single gift of exactly 199
+      case 'gift': sim.enqueue({ kind: 'gift', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), coins: e.coins * e.repeat, giftId: e.giftId }); return;
       case 'like': {
         const before = Math.floor(likes / GIFTS.likesPerRain);
         likes += e.count;

@@ -137,4 +137,17 @@ describe('survived disasters (A8)', () => {
     expect(sim.world.teams[plague.team].disastersSurvived).toBe(plague.team === 'blue' ? before + 1 : 1);
     expect(ev.some((e) => e.text.includes('survived the plague'))).toBe(true);
   });
+
+  it('the plague hits units with odd and even ids', () => {
+    const sim = grown();
+    applyGod(sim.world, 'plague', 'red', 'Gina');
+    const team = sim.world.effects.find((e) => e.kind === 'plague')!.team;
+    const hp = () => Object.fromEntries(sim.world.units.filter((u) => u.alive && u.team === team).map((u) => [u.id, u.hp]));
+    const before = hp();
+    for (let i = 0; i < 25; i++) sim.step();
+    const after = hp();
+    const hurt = Object.keys(before).filter((id) => (after[+id] ?? 0) < before[+id]).map(Number);
+    expect(hurt.some((id) => id % 2 === 0)).toBe(true);
+    expect(hurt.some((id) => id % 2 === 1)).toBe(true);
+  });
 });
