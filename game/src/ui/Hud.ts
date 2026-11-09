@@ -39,13 +39,18 @@ export function createHud(ui: HTMLElement) {
   const bottom = el('div', 'bottom', ui);
   el('div', 'heading', bottom, 'COMMANDS');
   const grid = el('div', 'commands', bottom);
-  for (const c of COMMANDS) el('span', '', grid, c.usage).title = c.help;
+  for (const c of COMMANDS) if (!('chief' in c)) el('span', '', grid, c.usage).title = c.help;
+  el('div', 'heading chief', bottom, `CHIEF: gift ${GIFTS.leaderPrice} coins to lead your tribe and use`);
+  const chief = el('div', 'commands chief', bottom);
+  for (const c of COMMANDS) if ('chief' in c) {
+    const row = el('span', '', chief, c.usage);
+    el('span', 'what', row, ` ${c.short}`);
+  }
   el('div', 'heading', bottom, 'GIFTS');
   const gifts = el('div', 'gifts', bottom);
   const rows: [string, string][] = GIFTS.tiers.map((t) => [`${t.minCoins}${t.minCoins > 1 ? '+' : ''}`, t.label]);
-  rows.push([String(GIFTS.leaderPrice), GIFTS.leaderLabel]);
   for (const [coins, label] of rows) {
-    const row = el('div', coins === String(GIFTS.leaderPrice) ? 'gift chief' : 'gift', gifts);
+    const row = el('div', 'gift', gifts);
     el('span', 'coins', row, coins);
     el('span', '', row, label);
   }
