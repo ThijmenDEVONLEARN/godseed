@@ -34,6 +34,11 @@ export function createBridge(port: number, dataFile: string) {
 
   const http = createServer((req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS).end(); return; }
+    if (req.method === 'GET') {
+      // someone opened the bridge in a browser: point them to the game and the test panel
+      res.writeHead(200, { ...CORS, 'Content-Type': 'text/plain; charset=utf-8' }).end('Godseed bridge is running.\n\nGame:       http://localhost:5173\nTest panel: http://localhost:5173/panel.html\n');
+      return;
+    }
     if (req.method !== 'POST' || req.url !== '/fake') { res.writeHead(404, CORS).end(); return; }
     if (!isLocal(req)) { res.writeHead(403, CORS).end(); return; }
     let raw = '';
