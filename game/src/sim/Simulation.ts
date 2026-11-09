@@ -1,6 +1,6 @@
 import { BALANCE } from '../config/balance';
 import { teamBrains } from './ai/TeamBrain';
-import { spawnUnit } from './entities';
+import { applyCommand, type SimCommand } from './commands';
 import { wallMap } from './pathfind';
 import { startWorld } from './setup';
 import { animals } from './systems/animals';
@@ -10,10 +10,10 @@ import { jobs } from './systems/jobs';
 import { movement } from './systems/movement';
 import { population } from './systems/population';
 import { round } from './systems/round';
-import type { SimEvent, Team, World } from './types';
+import { vote } from './systems/vote';
+import type { SimEvent, World } from './types';
 
-/** Everything viewers can do reaches the sim as a command; phase 2 adds the rest. */
-export type SimCommand = { kind: 'join'; viewerId: string; name: string; team: Team };
+export type { SimCommand };
 
 export interface Simulation {
   world: World;
@@ -32,7 +32,7 @@ export function createSimulation(seed: number): Simulation {
       world.tick++;
       world.events = [];
       world.pathBudget = BALANCE.pathBudgetPerTick;
-      for (const cmd of queue) apply(world, cmd);
+      for (const cmd of queue) applyCommand(world, cmd);
       queue = [];
       if (world.round.phase !== 'scoreboard') {
         teamBrains(world);
@@ -43,19 +43,10 @@ export function createSimulation(seed: number): Simulation {
         fire(world, false);
         population(world);
         animals(world, walls);
+        vote(world);
       }
       round(world);
       return world.events;
     },
   };
-}
-
-function apply(world: World, cmd: SimCommand): void {
-  if (cmd.kind !== 'join') return;
-  const mine = world.units.find((u) => u.viewerId === cmd.viewerId);
-  if (mine?.alive || (mine && world.tick < (mine.respawnAt ?? 0))) return;
-  if (mine) world.units.splice(world.units.indexOf(mine), 1);
-  const t = world.teams[cmd.team];
-  spawnUnit(world, cmd.team, 'viewer', t.homeX, t.homeY, { viewerId: cmd.viewerId, name: cmd.name });
-  world.events.push({ tick: world.tick, kind: 'join', team: cmd.team, x: t.homeX, y: t.homeY, text: `${cmd.name} joined ${cmd.team}` });
 }
