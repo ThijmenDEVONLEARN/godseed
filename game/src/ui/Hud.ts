@@ -6,7 +6,7 @@ import { GIFTS } from '../config/gifts';
 import { PALETTE } from '../render/palette';
 import type { SimEvent, World } from '../sim/types';
 
-const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm', 'info']);
+const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm', 'info', 'god', 'leader']);
 
 const el = (tag: string, cls: string, parent: HTMLElement, text = '') => {
   const e = document.createElement(tag);
@@ -39,17 +39,42 @@ export function createHud(ui: HTMLElement) {
   const bottom = el('div', 'bottom', ui);
   el('div', 'heading', bottom, 'COMMANDS');
   const grid = el('div', 'commands', bottom);
-  for (const c of COMMANDS) el('span', '', grid, c.usage).title = c.help;
+  for (const c of COMMANDS) if (!('chief' in c)) el('span', '', grid, c.usage).title = c.help;
+  el('div', 'heading chief', bottom, `CHIEF: gift ${GIFTS.leaderPrice} coins to lead your tribe and use`);
+  const chief = el('div', 'commands chief', bottom);
+  for (const c of COMMANDS) if ('chief' in c) {
+    const row = el('span', '', chief, c.usage);
+    el('span', 'what', row, ` ${c.short}`);
+  }
   el('div', 'heading', bottom, 'GIFTS');
   const gifts = el('div', 'gifts', bottom);
   const rows: [string, string][] = GIFTS.tiers.map((t) => [`${t.minCoins}${t.minCoins > 1 ? '+' : ''}`, t.label]);
-  rows.push([String(GIFTS.leaderPrice), GIFTS.leaderLabel]);
   for (const [coins, label] of rows) {
-    const row = el('div', coins === String(GIFTS.leaderPrice) ? 'gift chief' : 'gift', gifts);
+    const row = el('div', 'gift', gifts);
     el('span', 'coins', row, coins);
     el('span', '', row, label);
   }
-  el('div', 'social', bottom, GIFTS.social.join('   ·   '));
+  const social = el('div', 'social', bottom, GIFTS.social.join('   ·   '));
+  const vignette = el('div', 'vignette', ui);
+  vignette.hidden = true;
+  const showcase = el('div', 'showcase', ui);
+  showcase.hidden = true;
+  const queue: { text: string; team?: Team; big: boolean }[] = [];
+  let showing = false;
+  const next = () => {
+    const item = queue.shift();
+    if (!item) { showcase.hidden = true; showing = false; return; }
+    showing = true;
+    showcase.hidden = false;
+    showcase.textContent = item.text;
+    showcase.style.borderColor = item.team ? PALETTE.team[item.team] : '#ffe066';
+    showcase.classList.toggle('big', item.big);
+    showcase.classList.remove('pop');
+    void showcase.offsetWidth; // restart the pop animation
+    showcase.classList.add('pop');
+    // shorter while more gifts wait, so the banner keeps pace with what happens on the map
+    setTimeout(next, queue.length ? 2500 : item.big ? 6000 : 4000);
+  };
   const feed = el('div', 'feed', bottom);
 
   const board = el('div', 'board', ui);
@@ -64,6 +89,9 @@ export function createHud(ui: HTMLElement) {
   let highscores: RoundEnd[] = [];
   return {
     feed: line,
+    likes(total: number): void {
+      social.textContent = `${GIFTS.social.join('   ·   ')}   ·   likes ${total % GIFTS.likesPerRain}/${GIFTS.likesPerRain}`;
+    },
     connected(up: boolean): void { dot.classList.toggle('up', up); },
     setHighscores(rounds: RoundEnd[]): void { highscores = rounds; },
     update(world: World): void {
@@ -71,6 +99,7 @@ export function createHud(ui: HTMLElement) {
       const left = r.startTick + BALANCE.round.roundTicks - world.tick;
       time.textContent = r.phase === 'scoreboard' ? 'ROUND OVER' : clock(left);
       time.classList.toggle('storm', r.phase === 'storm');
+      vignette.hidden = r.phase !== 'storm';
       const v = world.vote;
       sub.classList.toggle('vote', !!v);
       if (v) {
@@ -85,6 +114,11 @@ export function createHud(ui: HTMLElement) {
         if (!FEED_KINDS.has(e.kind) || (e.kind === 'storm' && e.x !== undefined)) continue;
         line(e.text, e.team);
         if (e.kind === 'roundEnd') showBoard(world);
+        if (e.kind === 'god' || e.kind === 'leader' || (e.kind === 'storm' && e.x === undefined)) {
+          queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' || e.kind === 'storm' });
+          if (queue.length > 2) queue.shift(); // gift storm: skip the oldest so the banner never lags far behind
+          if (!showing) next();
+        }
       }
     },
   };

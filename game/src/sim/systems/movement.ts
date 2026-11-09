@@ -1,6 +1,6 @@
 import { BALANCE } from '../../config/balance';
 import { stepCost } from '../grid';
-import { damageBuilding } from './combat';
+import { damageBuilding, unitDamage } from './combat';
 import type { Mover, Team, Unit, World } from '../types';
 
 export const ready = (world: World, m: Mover) => world.tick >= m.moveStartTick + m.moveTicks;
@@ -20,7 +20,7 @@ function stepMover(world: World, m: Mover, team: Team | undefined, walls: Map<nu
     // an enemy wall is in the way: break it down before stepping through
     if (world.tick >= unit.nextHitTick) {
       const wall = world.buildings.find((b) => b.alive && b.type === 'wall' && b.y * world.w + b.x === next);
-      if (wall) damageBuilding(world, wall, unit.role === 'warrior' ? BALANCE.unit.warriorDamage : BALANCE.unit.workerDamage, unit.team);
+      if (wall) damageBuilding(world, wall, unitDamage(world, unit), unit.team);
       unit.nextHitTick = world.tick + BALANCE.unit.hitEveryTicks;
     }
     return;

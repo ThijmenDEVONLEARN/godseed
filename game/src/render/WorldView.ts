@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { Animal, Building, Mover, Unit, World } from '../sim/types';
+import { Tile } from '../sim/types';
 import { T, drawTile, type Art } from './art';
 import { PALETTE } from './palette';
 
@@ -16,18 +17,24 @@ export class WorldView {
   private sprites = new Map<number, Sprite>();
   private names = new Map<number, Text>();
   private fires: Sprite[] = [];
+  private beasts: Sprite[] = [];
+  private rain = new Graphics();
   private bubbles = new Map<number, { box: Container; until: number }>();
   private arrows = new Map<number, { g: Graphics; until: number }>();
+  private boltId = 0;
+  private flashUntil = 0;
   private seed = NaN;
   /** Labels and bubbles shrink while zoomed in so they stay about the same size on screen. */
   labelScale = 1;
+  /** Smooth tile positions of units drawn this frame, for the camera. */
+  readonly positions = new Map<number, { x: number; y: number }>();
 
   constructor(private art: Art, w: number, h: number) {
     this.canvas.width = w * T;
     this.canvas.height = h * T;
     this.ctx = this.canvas.getContext('2d')!;
     this.ground = new Sprite(Texture.from(this.canvas));
-    this.root.addChild(this.ground, this.things, this.labels);
+    this.root.addChild(this.ground, this.things, this.labels, this.rain);
   }
 
   /** `alpha` is how far (0..1) real time is between this tick and the next. */
@@ -36,14 +43,61 @@ export class WorldView {
     const now = world.tick + alpha;
     const seen = new Set<number>();
     for (const b of world.buildings) if (b.alive) { seen.add(b.id); this.building(b); }
-    for (const u of world.units) if (u.alive) { seen.add(u.id); this.unit(u, now); }
+    for (const u of world.units) if (u.alive) { seen.add(u.id); this.unit(world, u, now); }
     for (const a of world.animals) if (a.alive) { seen.add(a.id); this.animal(a, now); }
-    for (const [id, s] of this.sprites) if (!seen.has(id)) { s.destroy(); this.sprites.delete(id); }
+    for (const [id, s] of this.sprites) if (!seen.has(id)) { s.destroy(); this.sprites.delete(id); this.positions.delete(id); }
     for (const [id, t] of this.names) if (!seen.has(id)) { t.destroy(); this.names.delete(id); }
     const ms = performance.now();
     for (const [id, b] of this.bubbles) if (!seen.has(id) || ms > b.until) { b.box.destroy({ children: true }); this.bubbles.delete(id); }
-    for (const [id, a] of this.arrows) if (!seen.has(id) || ms > a.until) { a.g.destroy(); this.arrows.delete(id); }
+    for (const [id, a] of this.arrows) if ((id >= 0 && !seen.has(id)) || ms > a.until) { a.g.destroy(); this.arrows.delete(id); }
     this.syncFires(world, now);
+    this.syncBeasts(world, now);
+    this.syncRain(world, now);
+  }
+
+  private syncBeasts(world: World, now: number): void {
+    const moving = world.effects.filter((e) => e.kind === 'dragon' || e.kind === 'tornado' || e.kind === 'titan');
+    while (this.beasts.length < moving.length) {
+      const b = new Sprite();
+      b.anchor.set(0.5, 1);
+      this.beasts.push(b);
+      this.labels.addChild(b); // above everything: they fly or tower over the village
+    }
+    this.beasts.forEach((b, n) => {
+      const e = moving[n];
+      b.visible = !!e;
+      if (!e) return;
+      const kind = e.kind as 'dragon' | 'tornado' | 'titan';
+      b.texture = this.art.beast(kind, Math.floor(now / 3) % 2);
+      b.scale.set(kind === 'titan' ? 2 : 1.5);
+      b.position.set(e.x * T + T / 2, e.y * T + T - (kind === 'dragon' ? 40 + Math.sin(now / 5) * 8 : 0));
+    });
+  }
+
+  private syncRain(world: World, now: number): void {
+    this.rain.clear();
+    if (performance.now() < this.flashUntil) this.rain.rect(0, 0, world.w * T, world.h * T).fill({ color: '#ffffff', alpha: 0.3 });
+    for (const e of world.effects) {
+      const fade = Math.min(1, (e.until - now) / 20); // ease out over the last 2 s
+      if (e.kind === 'eclipse') this.rain.rect(0, 0, world.w * T, world.h * T).fill({ color: '#0a0820', alpha: 0.65 * fade });
+      if (e.kind === 'flood') {
+        // water over low ground around the flooded village, gently rippling
+        for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
+          const x = e.x + dx, y = e.y + dy;
+          if (dx * dx + dy * dy > 49 || x < 0 || y < 0 || x >= world.w || y >= world.h) continue;
+          const t = world.tiles[y * world.w + x];
+          if (t !== Tile.Grass && t !== Tile.Sand && t !== Tile.Farmland && t !== Tile.Burnt) continue;
+          this.rain.rect(x * T, y * T, T, T).fill({ color: (x + y + Math.floor(now / 4)) % 3 ? '#3f8fd8' : '#6fb3ee', alpha: 0.7 * fade });
+        }
+      }
+    }
+    if (world.tick >= world.rainUntil) return;
+    const w = world.w * T, h = world.h * T;
+    for (let i = 0; i < 260; i++) {
+      const x = (i * 977 + now * 40) % w, y = (i * 613 + now * 90) % h;
+      this.rain.moveTo(x, y).lineTo(x - 6, y + 22);
+    }
+    this.rain.stroke({ color: '#bfe3ff', width: 3, alpha: 0.6 });
   }
 
   /** Speech bubble above a unit for a few seconds. */
@@ -59,6 +113,18 @@ export class WorldView {
     box.addChild(bg, t);
     this.labels.addChild(box);
     this.bubbles.set(unitId, { box, until: performance.now() + ms });
+  }
+
+  /** A lightning bolt striking tile (x, y), gone after `ms`. */
+  bolt(x: number, y: number, ms = 350): void {
+    const cx = x * T + T / 2, top = y * T - 6 * T;
+    const pts = [cx, top];
+    for (let i = 1; i <= 6; i++) pts.push(cx + (i % 2 ? 14 : -14) * (i < 6 ? 1 : 0), top + i * T);
+    const g = new Graphics().poly(pts, false).stroke({ color: '#fffbe0', width: 7 }).stroke({ color: '#9fd8ff', width: 3 })
+      .circle(cx, y * T + T, T * 0.9).fill({ color: '#fff7c0', alpha: 0.5 });
+    this.labels.addChild(g);
+    this.flashUntil = performance.now() + 120; // whole-map flash, so a strike off-camera is still felt
+    this.arrows.set(-(this.boltId++ % 1000) - 1, { g, until: performance.now() + ms }); // negative ids: not tied to a unit, only expire by time
   }
 
   /** Blinking arrow above a unit, for !me and right after a join. */
@@ -108,11 +174,14 @@ export class WorldView {
     return { x: (m.px + (m.x - m.px) * k) * T + T / 2, y: (m.py + (m.y - m.py) * k) * T + T * 0.8, moving: k < 1 && (m.px !== m.x || m.py !== m.y) };
   }
 
-  private unit(u: Unit, now: number): void {
+  private unit(world: World, u: Unit, now: number): void {
     const p = this.place(u, now);
+    this.positions.set(u.id, { x: (p.x - T / 2) / T, y: (p.y - T * 0.8) / T });
     const frame = p.moving && Math.floor(now / 2) % 2 ? 1 : 0;
     const s = this.sprite(u.id, this.art.unit(u.team, u.role, frame), 0.5, 49.5 / 60);
     s.position.set(p.x, p.y);
+    s.scale.set(u.role === 'hero' ? 1.6 : u.role === 'leader' ? 1.25 : 1);
+    s.tint = u.buff && world.tick < u.buff.until ? (u.buff.kind === 'weapon' ? 0xffb0b0 : 0xb0d8ff) : world.effects.some((e) => e.kind === 'plague' && e.team === u.team) ? 0xb8ffb0 : 0xffffff;
     s.zIndex = p.y + 1;
     const bubble = this.bubbles.get(u.id), arrow = this.arrows.get(u.id);
     const ls = this.labelScale;

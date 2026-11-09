@@ -59,22 +59,21 @@ const route = createCommandRouter(sim, {
     view.say(id, `${u.name} · ${u.team} · ${Math.ceil(u.hp)} hp · ${u.kills} kills`, 4000);
   },
   vote: (viewerId, option) => sim.enqueue({ kind: 'vote', viewerId, option }),
+  likes: (total) => hud.likes(total),
 });
-bridge.onEvent((e) => {
-  route(e);
-  // shortcut: until gift effects exist (phase 3) a gift of 20+ coins shows the giver's tribe for 5 s
-  if (e.type === 'gift' && e.coins >= 20) {
-    const u = sim.world.units.find((x) => x.viewerId === e.viewer.id && x.alive);
-    const home = sim.world.teams[u?.team ?? 'red'];
-    camera.gift(u?.x ?? home.homeX, u?.y ?? home.homeY, 5000, performance.now(), u?.id);
-  }
-});
+bridge.onEvent((e) => route(e));
 
 function onEvents(world: World, events: SimEvent[]): void {
   hud.events(world, events);
   camera.events(events, performance.now());
   for (const e of events) {
+    if ((e.kind !== 'god' && e.kind !== 'leader') || e.x === undefined || e.y === undefined) continue;
+    const track = e.effect ? { effect: e.effect } : e.unitId !== undefined ? { unitId: e.unitId } : undefined;
+    camera.gift(e.x, e.y, (e.durationTicks ?? 50) * 100, performance.now(), track);
+  }
+  for (const e of events) {
     if (e.kind === 'join' && e.unitId !== undefined && e.team) view.point(e.unitId, PALETTE.team[e.team]);
+    if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y);
     if (e.kind === 'roundEnd' && e.team) bridge.send(roundEnd(world, e.team));
   }
 }
@@ -100,14 +99,20 @@ app.ticker.add((t) => {
     onEvents(sim.world, sim.step());
   }
   view.sync(sim.world, acc / msPerTick);
-  applyCamera(camera.update(sim.world, performance.now(), t.deltaMS));
+  applyCamera(camera.update(sim.world, performance.now(), t.deltaMS, (id) => view.positions.get(id)));
   hud.update(sim.world);
   debug.set(`fps ${app.ticker.FPS.toFixed(0)} · seed ${sim.world.seed} · units ${sim.world.units.filter((u) => u.alive).length} · cam ${camera.prio}`);
 });
 
-// dev keys: R new world, J fake viewer joins (the test panel at /panel.html does the rest)
+// dev keys: R new world, J fake viewer joins, G random gift, S start the Final Storm (the test panel at /panel.html does the rest)
 let fakes = 0;
 window.addEventListener('keydown', (e) => {
   if (e.key === 'r') location.search = `?seed=${Math.floor(Math.random() * 1e9)}`;
+  if (e.key === 'g') route({ type: 'gift', viewer: { id: `fake${fakes}`, name: `viewer_${fakes}` }, giftId: 0, giftName: 'Test', coins: [1, 5, 20, 50, 199, 200, 500][Math.floor(Math.random() * 7)], repeat: 1, ts: Date.now() });
   if (e.key === 'j') route({ type: 'chat', viewer: { id: `fake${++fakes}`, name: `viewer_${fakes}` }, text: `!join ${TEAMS[fakes % TEAMS.length]}`, ts: Date.now() });
+  if (e.key === 's' && sim.world.round.phase === 'play') {
+    // dev: jump to the real storm window, so it lasts the normal 10 minutes
+    sim.world.round.startTick = sim.world.tick - (BALANCE.round.roundTicks - BALANCE.round.stormTicks);
+    sim.world.round.phaseUntil = sim.world.tick;
+  }
 });

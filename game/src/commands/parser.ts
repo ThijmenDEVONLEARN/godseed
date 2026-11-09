@@ -49,6 +49,11 @@ export function parseChat(text: string, viewer: Viewer, world: World): Parsed {
       if (!raw.replace(/[^A-Za-z0-9_]/g, '') || hasBadWord(raw)) return { error: `${viewer.name}: !rename <newname>` };
       return { sim: { kind: 'rename', viewerId, name: uniqueName(world, { id: viewerId, name: raw }) } };
     }
+    case 'rally': case 'tax':
+      return { sim: { kind: 'leaderCmd', viewerId, cmd } };
+    case 'war': case 'peace':
+      if (!isTeam(arg)) return { error: `${viewer.name}: !${cmd} red / blue / yellow / green` };
+      return { sim: { kind: 'leaderCmd', viewerId, cmd, team: arg } };
     case 'vote': {
       const n = Number(arg);
       return n === 1 || n === 2 || n === 3 ? { vote: n } : { error: `${viewer.name}: vote 1, 2 or 3` };

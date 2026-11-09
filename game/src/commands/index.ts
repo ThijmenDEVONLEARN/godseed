@@ -1,4 +1,5 @@
-import { hasBadWord, type Team, type ViewerEvent } from '@godseed/shared';
+import { cleanName, hasBadWord, type Team, type ViewerEvent } from '@godseed/shared';
+import { GIFTS } from '../config/gifts';
 import { viewerUnit } from '../sim/commands';
 import type { Simulation } from '../sim/Simulation';
 import { createCooldown } from './cooldown';
@@ -11,12 +12,16 @@ export interface CommandSinks {
   /** Arrow and stats bubble above a unit, for !me. */
   highlight(unitId: number): void;
   vote(viewerId: string, option: 1 | 2 | 3): void;
+  /** Like total, for the rain progress bar. */
+  likes(total: number): void;
 }
 
 /** Turns viewer events into sim commands and on-screen feedback. Gifts, likes, follows and shares get effects in phase 3. */
 export function createCommandRouter(sim: Simulation, out: CommandSinks) {
   const cooldown = createCooldown();
   const welcomed = new Set<string>();
+  const warned = new Set<string>(); // viewers already told to wait during their current cooldown
+  let likes = 0;
   return (e: ViewerEvent, now = Date.now()): void => {
     const w = sim.world;
     switch (e.type) {
@@ -29,7 +34,12 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
         if ('vote' in parsed) { out.vote(e.viewer.id, parsed.vote); return; }
         if (parsed.sim.kind !== 'join') {
           const wait = cooldown(e.viewer.id, now);
-          if (wait) { out.feed(`${unit?.name ?? e.viewer.name}: wait ${wait}s`, unit?.team); return; }
+          if (wait) {
+            if (!warned.has(e.viewer.id)) out.feed(`${unit?.name ?? e.viewer.name}: wait ${wait}s`, unit?.team);
+            warned.add(e.viewer.id);
+            return;
+          }
+          warned.delete(e.viewer.id);
           if (unit?.alive) out.say(unit.id, e.text.trim().slice(0, 30));
         }
         sim.enqueue(parsed.sim);
@@ -40,9 +50,17 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
         welcomed.add(e.viewer.id);
         out.feed(`Welcome ${e.viewer.name}! Type !join to play`);
         return;
-      case 'follow': out.feed(`${e.viewer.name} followed!`); return;
-      case 'share': out.feed(`${e.viewer.name} shared the stream!`); return;
-      case 'gift': out.feed(`${e.viewer.name} sent ${e.giftName} (${e.coins} coins)`); return;
+      case 'follow': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'baby' }); return;
+      case 'share': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'goldChest' }); return;
+      // a streak (repeat > 1) counts its full value; the chief gift is matched by giftId, or by a single gift of exactly 199
+      case 'gift': sim.enqueue({ kind: 'gift', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), coins: e.coins * e.repeat, giftId: e.giftId }); return;
+      case 'like': {
+        const before = Math.floor(likes / GIFTS.likesPerRain);
+        likes += e.count;
+        out.likes(likes);
+        if (Math.floor(likes / GIFTS.likesPerRain) > before) sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'rain' });
+        return;
+      }
       default: return;
     }
   };

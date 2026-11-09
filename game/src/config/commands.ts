@@ -14,6 +14,10 @@ export const COMMANDS = [
   { usage: '!me', help: 'show where you are', free: true },
   { usage: '!rename', help: 'pick a new name' },
   { usage: '!vote 1', help: 'vote for a world event', free: true },
+  { usage: '!war red', help: 'chief only: declare war on a tribe', chief: true, short: 'declare war' },
+  { usage: '!peace red', help: 'chief only: make peace', chief: true, short: 'make peace' },
+  { usage: '!rally', help: 'chief only: everyone to me', chief: true, short: 'army to me' },
+  { usage: '!tax', help: 'chief only: 5 food → 5 gold', chief: true, short: '5 food → 5 gold' },
 ] as const;
 
 export const COMMAND_COOLDOWN_MS = 10_000;

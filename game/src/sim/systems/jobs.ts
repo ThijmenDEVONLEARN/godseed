@@ -38,6 +38,7 @@ function goTo(world: World, u: Unit, goal: number, walls: Map<number, Team>): bo
 export function chooseJob(world: World, u: Unit): void {
   const team = world.teams[u.team];
   if (u.order) { followOrder(world, u); return; }
+  if (u.role === 'hero') { u.job = { kind: 'idle' }; return; } // heroes are steered by the god system
   if (u.role === 'warrior' || u.role === 'leader') { u.job = { kind: 'defend' }; return; }
   const site = nextConstruction(world, u.team, u);
   const builders = site ? world.units.filter((o) => o.alive && o.job.kind === 'build' && o.job.targetId === site.id).length : 0;
@@ -92,7 +93,8 @@ function nearestSheep(world: World, u: Unit) {
 }
 
 function deliver(world: World, u: Unit): void {
-  if (u.carrying) world.teams[u.team].stock[u.carrying.res] += u.carrying.amount;
+  const golden = world.effects.some((e) => e.kind === 'goldenAge' && e.team === u.team);
+  if (u.carrying) world.teams[u.team].stock[u.carrying.res] += u.carrying.amount * (golden ? 2 : 1);
   u.carrying = undefined;
   u.job = { kind: 'idle' };
 }

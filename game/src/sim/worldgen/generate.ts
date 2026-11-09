@@ -155,6 +155,6 @@ export function generateWorld(seed: number): World {
     dirtyTiles: [], burningTiles: new Map(), regrowTiles: new Map(),
     units: [], buildings: [], animals: [], teams, nextId: 1, rng: createRng(t.seed ^ 0x5eed), events: [],
     round: { startTick: 0, phase: 'play', phaseUntil: BALANCE.round.roundTicks - BALANCE.round.stormTicks },
-    pathBudget: BALANCE.pathBudgetPerTick, stormUntil: 0,
+    pathBudget: BALANCE.pathBudgetPerTick, stormUntil: 0, rainUntil: 0, effects: [], leaders: {},
   };
 }

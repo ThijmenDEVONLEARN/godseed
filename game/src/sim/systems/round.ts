@@ -9,6 +9,11 @@ import { igniteTile } from './fire';
 import { cap } from './population';
 
 const R = BALANCE.round;
+/** byName of storm-made effects, so they do not count as a separate survived disaster. */
+export const STORM = 'The storm';
+
+/** A8: a tribe survives a disaster when it still has at least one finished building. */
+export const survived = (world: World, team: Team) => buildingsOf(world, team).some((b) => b.progress >= 1);
 
 export function scoreOf(world: World, team: Team): number {
   const t = world.teams[team];
@@ -28,11 +33,15 @@ export function round(world: World): void {
     r.phase = 'storm';
     r.phaseUntil = r.startTick + R.roundTicks;
     world.stormUntil = r.phaseUntil;
-    emit(world, { kind: 'storm', text: 'The Final Storm begins!' });
+    emit(world, { kind: 'storm', text: 'THE FINAL STORM BEGINS! Survive until the end' });
+    // one tornado sweeps across the whole continent; the camera follows it like a gift event
+    const y = Math.round(world.h / 2) + world.rng.int(15) - 7;
+    world.effects.push({ kind: 'tornado', team: TEAMS[0], until: world.tick + 640, x: 0, y, dx: 0.1, dy: 0, byName: STORM });
+    emit(world, { kind: 'god', x: 0, y, durationTicks: 300, effect: 'tornado', text: 'A storm tornado sweeps the land!' });
   } else if (r.phase === 'storm') {
     for (const team of TEAMS) {
       const t = world.teams[team];
-      t.disastersSurvived++;
+      if (survived(world, team)) t.disastersSurvived++;
       t.score = scoreOf(world, team);
     }
     const pop = (team: Team) => aliveUnitsOf(world, team).length;

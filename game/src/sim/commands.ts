@@ -1,8 +1,9 @@
-import { TEAMS } from '@godseed/shared';
 import { BALANCE } from '../config/balance';
-import { aliveUnitsOf, dist, emit, spawnUnit } from './entities';
+import { dist, emit, spawnUnit } from './entities';
 import { canAfford, placeBuilding } from './systems/buildings';
 import { castVote } from './systems/vote';
+import { applyGift, applyGod, smallestTeam } from './god';
+import type { GodEffect } from '../config/gifts';
 import type { Building, BuildingType, Order, Team, Unit, World } from './types';
 
 /** Everything a viewer can do reaches the sim as a command. Names are already filtered by the parser. */
@@ -15,6 +16,9 @@ export type SimCommand = { viewerId: string } & (
   | { kind: 'burn' }
   | { kind: 'rename'; name: string }
   | { kind: 'vote'; option: 1 | 2 | 3 }
+  | { kind: 'gift'; name: string; coins: number; giftId: number }
+  | { kind: 'god'; effect: GodEffect; name: string }
+  | { kind: 'leaderCmd'; cmd: 'rally' | 'tax' | 'war' | 'peace'; team?: Team }
 );
 
 const info = (world: World, text: string, team?: Team) => emit(world, { kind: 'info', team, text });
@@ -26,6 +30,11 @@ export function viewerUnit(world: World, viewerId: string): Unit | undefined {
 export function applyCommand(world: World, cmd: SimCommand): void {
   if (cmd.kind === 'join') return join(world, cmd.viewerId, cmd.name, cmd.team);
   if (cmd.kind === 'vote') return castVote(world, cmd.viewerId, cmd.option);
+  if (cmd.kind === 'gift') return applyGift(world, cmd.viewerId, cmd.name, cmd.coins, cmd.giftId);
+  if (cmd.kind === 'god') {
+    const own = viewerUnit(world, cmd.viewerId);
+    return applyGod(world, cmd.effect, own?.alive ? own.team : smallestTeam(world), cmd.name, own?.alive ? own : undefined);
+  }
   const u = viewerUnit(world, cmd.viewerId);
   if (!u?.alive) {
     info(world, u ? `${u.name}: you are dead, !join again soon` : `Type !join to get a villager first`);
@@ -71,6 +80,7 @@ export function applyCommand(world: World, cmd: SimCommand): void {
       u.path = undefined;
       return;
     }
+    case 'leaderCmd': return leaderCommand(world, u, cmd.cmd, cmd.team);
     case 'rename':
       info(world, `${u.name} is now called ${cmd.name}`, u.team);
       u.name = cmd.name;
@@ -106,8 +116,38 @@ function join(world: World, viewerId: string, name: string, wanted?: Team): void
   emit(world, { kind: 'join', team, x: t.homeX, y: t.homeY, unitId: u.id, text: `${name} joined ${team}` });
 }
 
-function smallestTeam(world: World): Team {
-  const sizes = TEAMS.map((t) => aliveUnitsOf(world, t).length);
-  const min = Math.min(...sizes);
-  return world.rng.pick(TEAMS.filter((_, i) => sizes[i] === min));
+const TAX_COOLDOWN_TICKS = 1200; // 2 min
+const PEACE_EXTRA_TICKS = 1500; // on top of the normal raid interval
+
+function leaderCommand(world: World, u: Unit, cmd: 'rally' | 'tax' | 'war' | 'peace', other?: Team): void {
+  if (world.leaders[u.team] !== u.id || u.role !== 'leader') { info(world, `${u.name}: only the chief can do that (gift 199 coins)`, u.team); return; }
+  const t = world.teams[u.team];
+  switch (cmd) {
+    case 'rally':
+      for (const x of world.units) if (x.alive && x.team === u.team && x !== u && !x.viewerId) { x.job = { kind: 'guard', x: u.x, y: u.y }; x.path = undefined; }
+      emit(world, { kind: 'info', team: u.team, text: `Chief ${u.name} rallies ${u.team}!` });
+      return;
+    case 'tax':
+      if (world.tick < (t.taxReadyTick ?? 0)) { info(world, `${u.name}: the people were taxed recently`, u.team); return; }
+      if (t.stock.food < 5) { info(world, `${u.name}: not enough food to tax`, u.team); return; }
+      t.taxReadyTick = world.tick + TAX_COOLDOWN_TICKS;
+      t.stock.food -= 5; t.stock.gold += 5;
+      emit(world, { kind: 'info', team: u.team, text: `Chief ${u.name} taxed the people: +5 gold` });
+      return;
+    case 'war': case 'peace':
+      if (!other || other === u.team) { info(world, `${u.name}: !${cmd} red / blue / yellow / green`, u.team); return; }
+      t.atWarWith = cmd === 'war' ? [other, ...t.atWarWith.filter((x) => x !== other)] : t.atWarWith.filter((x) => x !== other);
+      if (cmd === 'war') t.lastRaidTick = -1e9;
+      else {
+        // peace is mutual: both sides stop their raids and call back fighters already on the way
+        const o = world.teams[other];
+        o.atWarWith = o.atWarWith.filter((x) => x !== u.team);
+        t.lastRaidTick = o.lastRaidTick = world.tick + PEACE_EXTRA_TICKS; // both tribes stay defensive for ~5 min
+        for (const x of world.units) {
+          if (x.alive && x.job.kind === 'attack' && ((x.team === u.team && x.job.team === other) || (x.team === other && x.job.team === u.team))) { x.job = { kind: 'idle' }; x.path = undefined; }
+        }
+      }
+      emit(world, { kind: 'info', team: u.team, text: cmd === 'war' ? `${u.team.toUpperCase()} DECLARES WAR ON ${other.toUpperCase()}!` : `${u.team} makes peace with ${other}` });
+      return;
+  }
 }

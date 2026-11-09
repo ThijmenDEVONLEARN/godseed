@@ -11,6 +11,7 @@ import { movement } from './systems/movement';
 import { population } from './systems/population';
 import { round } from './systems/round';
 import { vote } from './systems/vote';
+import { godTick } from './god';
 import type { SimEvent, World } from './types';
 
 export type { SimCommand };
@@ -40,7 +41,8 @@ export function createSimulation(seed: number): Simulation {
         jobs(world, walls);
         movement(world, walls);
         combat(world);
-        fire(world, false);
+        godTick(world);
+        fire(world, world.tick < world.rainUntil);
         population(world);
         animals(world, walls);
         vote(world);

@@ -55,6 +55,7 @@ describe('simulation', () => {
     r.phaseUntil = sim.world.tick + 5;
     for (let i = 0; i < 6; i++) sim.step();
     expect(sim.world.round.phase).toBe('storm');
+    expect(sim.world.effects.some((e) => e.kind === 'tornado')).toBe(true); // the storm tornado
     sim.world.round.phaseUntil = sim.world.tick + 1;
     const ev = [sim.step(), sim.step()].flat();
     expect(ev.find((e) => e.kind === 'roundEnd')?.team).toBeDefined();

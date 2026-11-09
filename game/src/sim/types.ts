@@ -9,7 +9,7 @@ export enum Deposit { None, Tree, Stone, Iron, Gold }
 
 export type Resource = 'wood' | 'stone' | 'food' | 'gold' | 'iron';
 export type BuildingType = 'hut' | 'farm' | 'wall' | 'tower' | 'smithy' | 'temple' | 'bridge';
-export type Role = 'worker' | 'warrior' | 'viewer' | 'leader';
+export type Role = 'worker' | 'warrior' | 'viewer' | 'leader' | 'hero';
 /** Standing order a viewer gave with a chat command; their unit goes back to it whenever it is idle. */
 export type Order = 'chop' | 'mine' | 'farm' | 'defend' | 'march' | 'pray';
 
@@ -53,6 +53,10 @@ export interface Unit extends Mover {
   nextHitTick: number;
   kills: number;
   respawnAt?: number;
+  /** Gift buff on a viewer unit. */
+  buff?: { kind: 'weapon' | 'shield'; until: number };
+  /** Heroes vanish at this tick. */
+  expiresAt?: number;
 }
 
 export interface Building {
@@ -83,6 +87,8 @@ export interface TeamState {
   faith: number;
   kills: number;
   disastersSurvived: number;
+  /** Chief !tax works again from this tick. */
+  taxReadyTick?: number;
   atWarWith: Team[];
   lastThreatTick: number;
   /** Resources the team brain wants gathered, most needed first. */
@@ -92,7 +98,7 @@ export interface TeamState {
   alive: boolean;
 }
 
-export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire' | 'join' | 'info';
+export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire' | 'join' | 'info' | 'god' | 'leader';
 
 export interface SimEvent {
   tick: number;
@@ -102,6 +108,10 @@ export interface SimEvent {
   x?: number;
   y?: number;
   unitId?: number;
+  /** For 'god' events: how long the effect lasts, so the camera can stay on it. */
+  durationTicks?: number;
+  /** For 'god' events with a moving effect, so the camera can follow it. */
+  effect?: ActiveEffect['kind'];
 }
 
 export interface RoundState {
@@ -109,6 +119,18 @@ export interface RoundState {
   phase: 'play' | 'storm' | 'scoreboard';
   phaseUntil: number;
   winner?: Team;
+}
+
+export interface ActiveEffect {
+  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood';
+  team: Team;
+  until: number;
+  x: number;
+  y: number;
+  /** Direction per tick for things that move (tornado, titan). */
+  dx: number;
+  dy: number;
+  byName?: string;
 }
 
 export interface World {
@@ -135,6 +157,12 @@ export interface World {
   round: RoundState;
   pathBudget: number;
   stormUntil: number;
+  /** Rain until this tick: puts out fires. */
+  rainUntil: number;
+  /** Timed god effects that act every tick (dragon, tornado, plague, golden age). */
+  effects: ActiveEffect[];
+  /** Current chief per team (unit id). */
+  leaders: Partial<Record<Team, number>>;
   /** Open world vote: options, one ballot per viewer (last one counts), closing tick. */
   vote?: { options: VoteId[]; ballots: Record<string, 1 | 2 | 3>; until: number };
 }
