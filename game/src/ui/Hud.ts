@@ -1,10 +1,10 @@
 import { TEAMS } from '@godseed/shared';
 import { BALANCE } from '../config/balance';
+import { GIFTS } from '../config/gifts';
 import { PALETTE } from '../render/palette';
 import type { SimEvent, World } from '../sim/types';
 
 const COMMANDS = ['!join red', '!build hut', '!attack blue', '!chop', '!build farm', '!attack @name', '!mine', '!build wall', '!burn', '!farm', '!build tower', '!defend', '!pray', '!build bridge', '!march', '!me', '!rename', '!vote 1'];
-const GIFTS = 'Gifts: 1 trees · 5 sword · 20 meteor · 50 dragon · 199 CHIEF · 200 volcano';
 const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm']);
 
 const el = (tag: string, cls: string, parent: HTMLElement, text = '') => {
@@ -37,7 +37,16 @@ export function createHud(ui: HTMLElement) {
   el('div', 'heading', bottom, 'COMMANDS');
   const grid = el('div', 'commands', bottom);
   for (const c of COMMANDS) el('span', '', grid, c);
-  el('div', 'gifts', bottom, GIFTS);
+  el('div', 'heading', bottom, 'GIFTS');
+  const gifts = el('div', 'gifts', bottom);
+  const rows: [string, string][] = GIFTS.tiers.map((t) => [`${t.minCoins}${t.minCoins > 1 ? '+' : ''}`, t.label]);
+  rows.push([String(GIFTS.leaderPrice), GIFTS.leaderLabel]);
+  for (const [coins, label] of rows) {
+    const row = el('div', coins === String(GIFTS.leaderPrice) ? 'gift chief' : 'gift', gifts);
+    el('span', 'coins', row, coins);
+    el('span', '', row, label);
+  }
+  el('div', 'social', bottom, GIFTS.social.join('   ·   '));
   const feed = el('div', 'feed', bottom);
 
   const board = el('div', 'board', ui);
@@ -58,7 +67,7 @@ export function createHud(ui: HTMLElement) {
         if (!FEED_KINDS.has(e.kind) || (e.kind === 'storm' && e.x !== undefined)) continue;
         const line = el('div', '', feed, e.text);
         if (e.team) line.style.color = PALETTE.team[e.team];
-        while (feed.childElementCount > 3) feed.firstElementChild!.remove();
+        while (feed.childElementCount > 2) feed.firstElementChild!.remove();
         if (e.kind === 'roundEnd') showBoard(world);
       }
     },

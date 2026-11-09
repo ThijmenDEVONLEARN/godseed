@@ -13,11 +13,16 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .swatch { width: 20px; height: 20px; border: 3px solid #111; display: inline-block; }
 .topbar .sub { position: absolute; left: 36px; bottom: 6px; font-size: 20px; font-weight: 400; color: #aab4c4; }
 
-.bottom { position: absolute; top: 1400px; left: 0; right: 0; height: 520px; background: rgba(16, 20, 28, .92); padding: 18px 36px; box-sizing: border-box; }
-.heading { font-size: 30px; color: #aab4c4; }
-.commands { display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 6px; margin-top: 10px; font-size: 32px; color: #ffe066; }
-.gifts { margin-top: 16px; font-size: 22px; font-weight: 400; color: #aab4c4; border-bottom: 2px solid #ffffff22; padding-bottom: 12px; }
-.feed { margin-top: 10px; font-size: 26px; font-weight: 400; line-height: 34px; }
+.bottom { position: absolute; top: 1392px; left: 0; right: 0; height: 528px; background: rgba(16, 20, 28, .92); padding: 6px 36px; box-sizing: border-box; }
+.heading { font-size: 24px; color: #aab4c4; margin-top: 2px; }
+.commands { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; row-gap: 0; font-size: 28px; color: #ffe066; }
+.gifts { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 6px; margin-top: 4px; }
+.gift { display: flex; align-items: center; gap: 12px; font-size: 27px; }
+.gift .coins { min-width: 78px; text-align: center; background: #ffd23d; color: #111; border: 3px solid #111; border-radius: 6px; padding: 0 6px; }
+.gift.chief { color: #ffd23d; grid-column: 1 / -1; justify-content: center; }
+.gift.chief .coins { background: #ff4b4b; color: #fff; }
+.social { margin-top: 8px; font-size: 24px; color: #9fe7ff; border-bottom: 2px solid #ffffff22; padding-bottom: 8px; }
+.feed { margin-top: 6px; font-size: 24px; font-weight: 400; line-height: 28px; }
 
 .board { position: absolute; top: 560px; left: 140px; right: 140px; background: rgba(16, 20, 28, .95); border: 4px solid #111; padding: 36px 48px; text-align: center; }
 .board-title { font-size: 72px; margin-bottom: 24px; }
