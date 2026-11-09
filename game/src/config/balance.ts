@@ -42,6 +42,12 @@ export const BALANCE = {
 
   pray: { everyTicks: 30, faith: 1, templeFaith: 2 },
   guardRadius: 5,
+  god: {
+    heroHp: 300, heroDamage: 15, heroTicks: 1800, weaponBonus: 2, shieldHp: 30, buffTicks: 1200,
+    spawnCount: 6, meteorRadius: 3, meteorDamage: 100, wolfPack: 6, lightningDamage: 60,
+    dragonTicks: 1200, dragonFireEvery: 20, tornadoDamage: 80, plagueTicks: 1200, plagueEvery: 10,
+    volcanoRadius: 2, goldenAgeTicks: 1800, rainTicks: 300, goldChest: 10, rainOfGold: 20,
+  },
 
   brain: { everyTicks: 50, raidEveryTicks: 1500, raidChance: 0.3, raidWorkerShare: 0.2, threatMemoryTicks: 200, defendRadius: 6 },
 

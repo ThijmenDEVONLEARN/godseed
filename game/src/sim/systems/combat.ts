@@ -5,17 +5,21 @@ import { setTile } from '../grid';
 import { Tile, type Building, type Team, type Unit, type World } from '../types';
 
 export function unitDamage(world: World, u: Unit): number {
-  const base = u.role === 'warrior' || u.role === 'leader' ? BALANCE.unit.warriorDamage : BALANCE.unit.workerDamage;
+  if (u.role === 'hero') return BALANCE.god.heroDamage;
+  let base = u.role === 'warrior' || u.role === 'leader' ? BALANCE.unit.warriorDamage : BALANCE.unit.workerDamage;
+  if (u.buff?.kind === 'weapon' && world.tick < u.buff.until) base *= BALANCE.god.weaponBonus;
   return completeOf(world, u.team, 'smithy').length ? base * BALANCE.unit.smithyBonus : base;
 }
 
 export function damageUnit(world: World, target: Unit, amount: number, by?: Unit, cause = 'fell'): void {
   if (!target.alive) return;
+  if (target.buff?.kind === 'shield' && world.tick < target.buff.until) amount /= 2;
   target.hp -= amount;
   if (target.hp > 0) return;
   target.alive = false;
   target.path = undefined;
   if (target.viewerId) target.respawnAt = world.tick + BALANCE.unit.viewerRespawnTicks;
+  if (world.leaders[target.team] === target.id) { world.leaders[target.team] = undefined; target.role = 'viewer'; }
   const who = target.name ? `${target.name} (${target.team})` : `a ${target.team} villager`;
   if (by) {
     by.kills++;

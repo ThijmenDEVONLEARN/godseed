@@ -6,7 +6,7 @@ export function emit(world: World, e: Omit<SimEvent, 'tick'>): void {
 }
 
 export function spawnUnit(world: World, team: Team, role: Role, x: number, y: number, extra: Partial<Unit> = {}): Unit {
-  const hp = role === 'warrior' || role === 'leader' ? BALANCE.unit.warriorHp : BALANCE.unit.workerHp;
+  const hp = role === 'hero' ? BALANCE.god.heroHp : role === 'warrior' || role === 'leader' ? BALANCE.unit.warriorHp : BALANCE.unit.workerHp;
   const u: Unit = {
     id: world.nextId++, team, role, x, y, px: x, py: y, moveStartTick: world.tick, moveTicks: 1,
     hp, maxHp: hp, alive: true, hunger: BALANCE.hunger.max, job: { kind: 'idle' }, nextHitTick: 0, kills: 0, ...extra,
