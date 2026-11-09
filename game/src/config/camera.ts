@@ -1,6 +1,9 @@
 /** Camera direction (plan step 2.11). Times in ms. */
 export const CAMERA = {
-  zoom: 2.5,
+  zoom: 2.5, // gifts and tours
+  fightZoom: 2.1, // a bit wider so both sides of a fight fit
+  joinZoom: 2.8,
+  fightRadius: 8,
   easeMs: 600,
   giftHoldAfterMs: 12_000, // stays this long after a gift event ends (10–15 s)
   eventHoldMs: 6_000, // a fight stays in view this long after its last hit

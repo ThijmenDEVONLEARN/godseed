@@ -85,9 +85,10 @@ function makeUnit(team: Team, role: Role, frame: number): Texture {
   rect(ctx, X - 4 * k, Y - 2 * k, 8 * k, 9 * k, P.outline); rect(ctx, X - 3 * k, Y - k, 6 * k, 7 * k, col);
   rect(ctx, X - 3 * k, Y - 8 * k, 6 * k, 6 * k, P.outline); rect(ctx, X - 2 * k, Y - 7 * k, 4 * k, 4 * k, P.skin);
   rect(ctx, X - 1.5 * k, Y - 5.5 * k, k * 0.7, k * 0.7, P.outline); rect(ctx, X + 0.8 * k, Y - 5.5 * k, k * 0.7, k * 0.7, P.outline);
-  if (role === 'warrior' || role === 'leader') { rect(ctx, X + 4 * k, Y - 7 * k, 1.5 * k, 10 * k, P.outline); rect(ctx, X + 4.3 * k, Y - 6.7 * k, 0.9 * k, 7 * k, '#dfe6ee'); rect(ctx, X + 3 * k, Y - k, 3.5 * k, 1.5 * k, P.outline); }
+  if (role === 'hero') { rect(ctx, X - 5 * k, Y - 2 * k, 10 * k, 8 * k, P.outline); rect(ctx, X - 4.5 * k, Y - 1.5 * k, 9 * k, 7 * k, P.gold); rect(ctx, X - 3 * k, Y - k, 6 * k, 7 * k, col); }
+  if (role === 'warrior' || role === 'leader' || role === 'hero') { rect(ctx, X + 4 * k, Y - 7 * k, 1.5 * k, 10 * k, P.outline); rect(ctx, X + 4.3 * k, Y - 6.7 * k, 0.9 * k, 7 * k, '#dfe6ee'); rect(ctx, X + 3 * k, Y - k, 3.5 * k, 1.5 * k, P.outline); }
   if (role === 'viewer') rect(ctx, X - 3 * k, Y - 9 * k, 6 * k, 1.6 * k, col);
-  if (role === 'leader') { rect(ctx, X - 3 * k, Y - 11 * k, 6 * k, 3 * k, P.gold); rect(ctx, X - 3 * k, Y - 12 * k, 1.5 * k, 1.5 * k, P.gold); rect(ctx, X + 1.5 * k, Y - 12 * k, 1.5 * k, 1.5 * k, P.gold); }
+  if (role === 'leader' || role === 'hero') { rect(ctx, X - 3 * k, Y - 11 * k, 6 * k, 3 * k, P.gold); rect(ctx, X - 3 * k, Y - 12 * k, 1.5 * k, 1.5 * k, P.gold); rect(ctx, X + 1.5 * k, Y - 12 * k, 1.5 * k, 1.5 * k, P.gold); }
   return Texture.from(c);
 }
 
@@ -169,7 +170,42 @@ function makeFire(frame: number): Texture {
   return Texture.from(c);
 }
 
+function makeBeast(kind: 'dragon' | 'tornado' | 'titan', frame: number): Texture {
+  const s = ART;
+  if (kind === 'dragon') {
+    const [c, ctx] = canvas(48 * s, 32 * s);
+    const wing = frame ? 2 : 8;
+    tri(ctx, [10 * s, 16 * s, 22 * s, wing * s, 24 * s, 18 * s], P.outline);
+    tri(ctx, [38 * s, 16 * s, 26 * s, wing * s, 24 * s, 18 * s], P.outline);
+    tri(ctx, [12 * s, 15 * s, 22 * s, (wing + 2) * s, 23 * s, 17 * s], '#b0261d');
+    tri(ctx, [36 * s, 15 * s, 26 * s, (wing + 2) * s, 25 * s, 17 * s], '#b0261d');
+    outlined(ctx, 18 * s, 15 * s, 12 * s, 7 * s, '#e0362a', s);
+    outlined(ctx, 30 * s, 12 * s, 7 * s, 6 * s, '#e0362a', s);
+    rect(ctx, 34 * s, 13 * s, 1.5 * s, 1.5 * s, P.gold);
+    outlined(ctx, 10 * s, 19 * s, 8 * s, 3 * s, '#e0362a', s);
+    rect(ctx, 37 * s, 15 * s, 6 * s, 2 * s, frame ? '#ffd23d' : '#ff8a1f');
+    return Texture.from(c);
+  }
+  if (kind === 'tornado') {
+    const [c, ctx] = canvas(32 * s, 40 * s);
+    for (let i = 0; i < 8; i++) {
+      const w = (6 + i * 3) * s, y = (34 - i * 4) * s, x = 16 * s - w / 2 + ((i + frame) % 2 ? s * 2 : -s * 2);
+      outlined(ctx, x, y, w, 3 * s, i % 2 ? '#c9ced6' : '#9aa0aa', s);
+    }
+    return Texture.from(c);
+  }
+  const [c, ctx] = canvas(32 * s, 48 * s);
+  const y = frame ? s : 0;
+  outlined(ctx, 8 * s, 14 * s + y, 16 * s, 18 * s, '#7c8088', 2 * s);
+  outlined(ctx, 11 * s, 4 * s + y, 10 * s, 9 * s, '#8b8f99', 2 * s);
+  rect(ctx, 13 * s, 7 * s + y, 2 * s, 2 * s, '#ff3b1f'); rect(ctx, 17 * s, 7 * s + y, 2 * s, 2 * s, '#ff3b1f');
+  outlined(ctx, 9 * s, 33 * s, 5 * s, 12 * s - y, '#6d7179', 2 * s); outlined(ctx, 18 * s, 33 * s, 5 * s, 12 * s + y - s, '#6d7179', 2 * s);
+  outlined(ctx, 3 * s, 15 * s + y, 4 * s, 14 * s, '#7c8088', s); outlined(ctx, 25 * s, 15 * s + y, 4 * s, 14 * s, '#7c8088', s);
+  return Texture.from(c);
+}
+
 export interface Art {
+  beast: (kind: 'dragon' | 'tornado' | 'titan', frame: number) => Texture;
   unit: (team: Team, role: Role, frame: number) => Texture;
   building: (type: BuildingType, team: Team) => Texture;
   animal: (kind: 'sheep' | 'wolf', frame: number) => Texture;
@@ -178,7 +214,7 @@ export interface Art {
 
 /** Draws every sprite once at start-up. */
 export function createArt(): Art {
-  const roles: Role[] = ['worker', 'warrior', 'viewer', 'leader'];
+  const roles: Role[] = ['worker', 'warrior', 'viewer', 'leader', 'hero'];
   const types: BuildingType[] = ['hut', 'farm', 'wall', 'tower', 'smithy', 'temple', 'bridge'];
   const units = new Map<string, Texture>(), buildings = new Map<string, Texture>();
   for (const team of TEAMS) {
@@ -187,7 +223,9 @@ export function createArt(): Art {
   }
   const animals = { sheep: [makeAnimal('sheep', 0), makeAnimal('sheep', 1)], wolf: [makeAnimal('wolf', 0), makeAnimal('wolf', 1)] };
   const fires = [makeFire(0), makeFire(1)];
+  const beasts = { dragon: [makeBeast('dragon', 0), makeBeast('dragon', 1)], tornado: [makeBeast('tornado', 0), makeBeast('tornado', 1)], titan: [makeBeast('titan', 0), makeBeast('titan', 1)] };
   return {
+    beast: (kind, frame) => beasts[kind][frame],
     unit: (team, role, frame) => units.get(`${team}${role}${frame}`)!,
     building: (type, team) => buildings.get(`${type}${team}`)!,
     animal: (kind, frame) => animals[kind][frame],
