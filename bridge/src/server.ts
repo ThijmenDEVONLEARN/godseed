@@ -25,12 +25,17 @@ export function parseFake(body: unknown): ViewerEvent | null {
   }
 }
 
-/** WebSocket hub for the game plus `POST /fake` for the test panel. TikTok events plug into `publish` in phase 4. */
+/** WebSocket hub for the game plus `POST /fake` for the test panel. TikTok events come in through `publish`. */
 export function createBridge(port: number, dataFile: string) {
   const store = createStore(dataFile);
   const clients = new Set<WebSocket>();
   const send = (ws: WebSocket, m: BridgeMessage) => ws.send(JSON.stringify(m));
-  const publish = (event: ViewerEvent) => { for (const ws of clients) send(ws, { type: 'event', event }); };
+  // a game that (re)connects learns the last known TikTok state, not a stale "fake: up"
+  let status: ViewerEvent = { type: 'status', connected: true, source: 'fake', ts: Date.now() };
+  const publish = (event: ViewerEvent) => {
+    if (event.type === 'status') status = event;
+    for (const ws of clients) send(ws, { type: 'event', event });
+  };
 
   const http = createServer((req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS).end(); return; }
@@ -55,7 +60,7 @@ export function createBridge(port: number, dataFile: string) {
   const wss = new WebSocketServer({ server: http });
   wss.on('connection', (ws) => {
     clients.add(ws);
-    send(ws, { type: 'event', event: { type: 'status', connected: true, source: 'fake', ts: Date.now() } });
+    send(ws, { type: 'event', event: status });
     send(ws, { type: 'highscores', rounds: store.rounds() });
     ws.on('close', () => clients.delete(ws));
     ws.on('message', (data) => {

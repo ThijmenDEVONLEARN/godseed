@@ -1,0 +1,10 @@
+{
+  "_note": "Shaped like tiktok-live-proto v3 WebcastGiftMessage, trimmed to the fields we read; users anonymized.",
+  "rose": { "common": { "msgId": "m1" }, "user": { "id": "111", "displayId": "viewer_a", "nickname": "Viewer A" }, "giftId": "5655", "repeatCount": 1, "repeatEnd": 0, "gift": { "type": 1, "diamondCount": 1, "name": "Rose" } },
+  "roseStreak": [
+    { "common": { "msgId": "s1" }, "user": { "id": "111", "displayId": "viewer_a", "nickname": "Viewer A" }, "giftId": "5655", "repeatCount": 1, "repeatEnd": 0, "gift": { "type": 1, "diamondCount": 1, "name": "Rose" } },
+    { "common": { "msgId": "s2" }, "user": { "id": "111", "displayId": "viewer_a", "nickname": "Viewer A" }, "giftId": "5655", "repeatCount": 4, "repeatEnd": 0, "gift": { "type": 1, "diamondCount": 1, "name": "Rose" } },
+    { "common": { "msgId": "s3" }, "user": { "id": "111", "displayId": "viewer_a", "nickname": "Viewer A" }, "giftId": "5655", "repeatCount": 7, "repeatEnd": 1, "gift": { "type": 1, "diamondCount": 1, "name": "Rose" } }
+  ],
+  "lion": { "common": { "msgId": "l1" }, "user": { "id": "222", "displayId": "viewer_b", "nickname": "Viewer B" }, "giftId": "6369", "repeatCount": 1, "repeatEnd": 0, "gift": { "type": 2, "diamondCount": 29999, "name": "Lion" } }
+}

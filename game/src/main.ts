@@ -50,7 +50,10 @@ const debug = createDebug(ui);
 const bridge = createBridgeClient(params.get('bridge') ?? `ws://${location.hostname || 'localhost'}:8765`);
 // local Kokoro voice (tts/server.py); ?voice=off silences it, ?voice=am_michael picks another voice
 const speaker = params.get('voice') === 'off' ? undefined : createSpeaker({ url: params.get('tts') ?? 'http://127.0.0.1:8880', voice: params.get('voice') ?? 'af_heart' });
-bridge.onStatus((up) => hud.connected(up));
+// green dot = bridge reachable and TikTok (or the test panel) feeding events
+let bridgeUp = false, liveUp = true;
+const showStatus = () => hud.connected(bridgeUp && liveUp);
+bridge.onStatus((up) => { bridgeUp = up; showStatus(); });
 bridge.onHighscores((rounds) => hud.setHighscores(rounds));
 const route = createCommandRouter(sim, {
   feed: hud.feed,
@@ -64,7 +67,14 @@ const route = createCommandRouter(sim, {
   vote: (viewerId, option) => sim.enqueue({ kind: 'vote', viewerId, option }),
   likes: (total) => hud.likes(total),
 });
-bridge.onEvent((e) => route(e));
+bridge.onEvent((e) => {
+  if (e.type === 'status') {
+    if (liveUp && !e.connected) hud.feed('TikTok chat offline, reconnecting...');
+    liveUp = e.connected;
+    showStatus();
+  }
+  route(e);
+});
 
 function onEvents(world: World, events: SimEvent[]): void {
   hud.events(world, events);

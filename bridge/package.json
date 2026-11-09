@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@godseed/shared": "workspace:*",
+    "tiktok-live-connector": "2.5.0",
     "ws": "^8.22.2"
   }
 }
