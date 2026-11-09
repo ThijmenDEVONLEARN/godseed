@@ -28,3 +28,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .board-title { font-size: 72px; margin-bottom: 24px; }
 .board-row { display: flex; justify-content: space-between; font-size: 44px; line-height: 64px; }
 .board .sub { font-size: 26px; font-weight: 400; color: #aab4c4; margin-top: 20px; }
+.dot { position: absolute; right: 18px; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: #ff4b4b; border: 2px solid #111; }
+.dot.up { background: #38d16a; }
+.board-row.small { font-size: 30px; line-height: 40px; }
+.topbar .sub.vote { color: #ffe066; font-weight: 700; }
