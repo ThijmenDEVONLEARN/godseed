@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Godseed test panel</title>
+    <style>
+      body { font: 16px system-ui, sans-serif; background: #10141c; color: #eef; margin: 0; padding: 20px; max-width: 720px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.hint { color: #aab4c4; margin: 0 0 16px; }
+      fieldset { border: 1px solid #ffffff26; border-radius: 8px; margin: 0 0 14px; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      legend { color: #aab4c4; padding: 0 6px; }
+      input, select, button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #ffffff33; background: #1a2233; color: #eef; }
+      button { background: #ffe066; color: #111; border-color: #111; font-weight: 600; cursor: pointer; }
+      button.stop { background: #ff4b4b; color: #fff; }
+      #log { font: 13px ui-monospace, monospace; color: #9fe7ff; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Godseed test panel</h1>
+    <p class="hint">Sends fake TikTok events to the bridge (start it with <code>pnpm --filter @godseed/bridge dev</code>).</p>
+    <fieldset>
+      <legend>Viewer</legend>
+      <input id="name" value="Alice" size="14" aria-label="viewer name" />
+      <input id="text" value="!join red" size="28" aria-label="chat text" />
+      <button id="chat">Chat</button>
+    </fieldset>
+    <fieldset>
+      <legend>Quick commands</legend>
+      <span id="quick"></span>
+    </fieldset>
+    <fieldset>
+      <legend>Social and gifts</legend>
+      <button data-like>Like x100</button>
+      <button data-social="follow">Follow</button>
+      <button data-social="share">Share</button>
+      <button data-social="enter">Enter</button>
+      <select id="gift" aria-label="gift">
+        <option value="1">Rose · 1 coin</option>
+        <option value="5">Finger heart · 5 coins</option>
+        <option value="20">Meteor · 20 coins</option>
+        <option value="50">Dragon · 50 coins</option>
+        <option value="199">Chief · 199 coins</option>
+        <option value="200">Volcano · 200 coins</option>
+        <option value="500">God · 500 coins</option>
+      </select>
+      <button id="sendGift">Send gift</button>
+    </fieldset>
+    <fieldset>
+      <legend>Spam test</legend>
+      <input id="spamN" type="number" value="20" min="1" max="200" aria-label="number of fake viewers" /> viewers
+      <button id="spam">Start spam</button>
+    </fieldset>
+    <div id="log" role="log"></div>
+    <script type="module" src="/src/panel/main.ts"></script>
+  </body>
+</html>
