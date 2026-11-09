@@ -3,3 +3,5 @@ dist/
 .env
 bridge/data/
 *.log
+tts/models/
+__pycache__/
