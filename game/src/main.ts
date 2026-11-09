@@ -49,7 +49,7 @@ const debug = createDebug(ui);
 
 const bridge = createBridgeClient(params.get('bridge') ?? `ws://${location.hostname || 'localhost'}:8765`);
 // local Kokoro voice (tts/server.py); ?voice=off silences it, ?voice=am_michael picks another voice
-const speaker = params.get('voice') === 'off' ? undefined : createSpeaker({ url: params.get('tts') ?? 'http://127.0.0.1:8880', voice: params.get('voice') ?? 'af_heart' });
+const speaker = params.get('voice') === 'off' ? undefined : createSpeaker({ url: params.get('tts') ?? 'http://127.0.0.1:8880', voice: params.get('voice') ?? 'bm_george' });
 // green dot = bridge reachable and TikTok (or the test panel) feeding events
 let bridgeUp = false, liveUp = true;
 const showStatus = () => hud.connected(bridgeUp && liveUp);

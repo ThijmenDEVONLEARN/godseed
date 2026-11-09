@@ -1,12 +1,12 @@
 """Local Kokoro voice for Godseed.
 
 Runs on the streaming PC, never in the cloud. The game asks it to speak short lines:
-    GET http://127.0.0.1:8880/tts?text=Hello&voice=af_heart  -> audio/wav
+    GET http://127.0.0.1:8880/tts?text=Hello&voice=bm_george  -> audio/wav
     GET http://127.0.0.1:8880/voices                          -> JSON list of voice names
 
 Setup (once):  pip install -r tts/requirements.txt
 Run:           python tts/server.py            (downloads the model, ~350 MB, on first start)
-Options:       --port 8880  --voice af_heart  --speed 1.0
+Options:       --port 8880  --voice bm_george  --speed 1.0
 """
 
 import argparse
@@ -43,7 +43,7 @@ def download() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8880)
-    ap.add_argument("--voice", default="af_heart")
+    ap.add_argument("--voice", default="bm_george")
     ap.add_argument("--speed", type=float, default=1.0)
     args = ap.parse_args()
 
