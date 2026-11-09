@@ -19,6 +19,8 @@ export class WorldView {
   private bubbles = new Map<number, { box: Container; until: number }>();
   private arrows = new Map<number, { g: Graphics; until: number }>();
   private seed = NaN;
+  /** Labels and bubbles shrink while zoomed in so they stay about the same size on screen. */
+  labelScale = 1;
 
   constructor(private art: Art, w: number, h: number) {
     this.canvas.width = w * T;
@@ -113,8 +115,10 @@ export class WorldView {
     s.position.set(p.x, p.y);
     s.zIndex = p.y + 1;
     const bubble = this.bubbles.get(u.id), arrow = this.arrows.get(u.id);
-    bubble?.box.position.set(p.x, p.y - (u.name ? 104 : 56));
-    if (arrow) { arrow.g.position.set(p.x, p.y - (u.name ? 104 : 56) - (bubble ? 64 : 0)); arrow.g.visible = Math.floor(performance.now() / 250) % 2 === 0; }
+    const ls = this.labelScale;
+    bubble?.box.position.set(p.x, p.y - 56 - (u.name ? 48 * ls : 0));
+    bubble?.box.scale.set(ls);
+    if (arrow) { arrow.g.scale.set(ls); arrow.g.position.set(p.x, p.y - 56 - (u.name ? 48 * ls : 0) - (bubble ? 64 * ls : 0)); arrow.g.visible = Math.floor(performance.now() / 250) % 2 === 0; }
     if (!u.name) return;
     let label = this.names.get(u.id);
     if (!label) {
@@ -124,6 +128,7 @@ export class WorldView {
       this.labels.addChild(label);
     }
     if (label.text !== u.name) label.text = u.name;
+    label.scale.set(ls);
     label.position.set(p.x, p.y - 56);
   }
 

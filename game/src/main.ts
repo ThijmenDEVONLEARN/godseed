@@ -39,6 +39,7 @@ function applyCamera(c: { x: number; y: number; zoom: number }): void {
   const half = { x: ZONES.map.w / 2 / tile, y: ZONES.map.h / 2 / tile };
   const cx = Math.min(MAP_TILES.w - half.x, Math.max(half.x, c.x + 0.5)), cy = Math.min(MAP_TILES.h - half.y, Math.max(half.y, c.y + 0.5));
   view.root.scale.set(scale);
+  view.labelScale = Math.min(1, 1.5 / c.zoom);
   view.root.position.set(ZONES.map.x + ZONES.map.w / 2 - cx * tile, ZONES.map.y + ZONES.map.h / 2 - cy * tile);
 }
 
