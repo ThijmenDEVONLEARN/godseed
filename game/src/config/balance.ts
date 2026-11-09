@@ -7,7 +7,6 @@ export const BALANCE = {
   startStock: { wood: 30, stone: 10, food: 40, gold: 0, iron: 0 } as Record<Resource, number>,
   startNpcs: 8,
   npcMin: 8,
-  npcTarget: 16,
   npcRespawnTicks: 150,
   popBase: 10,
   popPerHut: 6,
@@ -39,7 +38,7 @@ export const BALANCE = {
 
   unit: { workerHp: 30, warriorHp: 50, workerDamage: 2, warriorDamage: 5, hitEveryTicks: 10, smithyBonus: 1.5, viewerRespawnTicks: 300 },
   tower: { range: 6, damage: 3, everyTicks: 10 },
-  fire: { buildingDamagePerTick: 5, spreadChance: 0.05, forestBurnTicks: 30, burntRegrowTicks: 3000 },
+  fire: { buildingDamagePerTick: 0.5, checkEveryTicks: 10, spreadChance: 0.15, putOutChance: 0.04, forestBurnTicks: 30, burntRegrowTicks: 3000 },
 
   brain: { everyTicks: 50, raidEveryTicks: 1500, raidChance: 0.3, raidWorkerShare: 0.2, threatMemoryTicks: 200, defendRadius: 6 },
 

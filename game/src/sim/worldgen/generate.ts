@@ -144,7 +144,7 @@ export function reachable(tiles: Uint8Array, w: number, h: number, from: number)
 }
 
 export function createTeamState(team: Team, home: { x: number; y: number }): TeamState {
-  return { team, homeX: home.x, homeY: home.y, stock: { ...BALANCE.startStock }, faith: 0, kills: 0, disastersSurvived: 0, atWarWith: [], lastThreatTick: -1e9, score: 0, alive: true };
+  return { team, homeX: home.x, homeY: home.y, stock: { ...BALANCE.startStock }, faith: 0, kills: 0, disastersSurvived: 0, atWarWith: [], lastThreatTick: -1e9, focus: ['food', 'wood', 'stone'], lastRaidTick: 0, score: 0, alive: true };
 }
 
 export function generateWorld(seed: number): World {

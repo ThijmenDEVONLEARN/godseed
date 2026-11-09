@@ -79,11 +79,14 @@ export interface TeamState {
   disastersSurvived: number;
   atWarWith: Team[];
   lastThreatTick: number;
+  /** Resources the team brain wants gathered, most needed first. */
+  focus: Resource[];
+  lastRaidTick: number;
   score: number;
   alive: boolean;
 }
 
-export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire';
+export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire' | 'join';
 
 export interface SimEvent {
   tick: number;
