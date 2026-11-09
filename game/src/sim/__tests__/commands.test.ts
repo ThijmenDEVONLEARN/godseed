@@ -81,3 +81,15 @@ describe('world vote', () => {
     expect(ev.some((e) => e.text.startsWith('The people chose'))).toBe(true);
   });
 });
+
+describe('viewer attacks end', () => {
+  it('goes back to its order once nothing is left nearby', () => {
+    const { sim, run, alice, bob } = setup();
+    run({ kind: 'order', viewerId: 'a', order: 'chop' });
+    run({ kind: 'attackPlayer', viewerId: 'a', targetName: 'Bob' });
+    bob().alive = false;
+    for (const e of sim.world.units) if (e.team === 'blue' && Math.abs(e.x - alice().x) + Math.abs(e.y - alice().y) <= 8) e.alive = false;
+    sim.step(); sim.step();
+    expect(alice().job.kind).not.toBe('attack');
+  });
+});

@@ -4,7 +4,8 @@ import type { SimEvent, World } from '../sim/types';
 
 /** Lower number wins: gift event > fight or other event > join > team tour > whole map. */
 enum Prio { Gift = 1, Event = 2, Join = 3, Tour = 4, None = 9 }
-interface Focus { prio: Prio; x: number; y: number; until: number }
+/** `unitId`: follow that unit while it lives instead of a fixed spot. */
+interface Focus { prio: Prio; x: number; y: number; until: number; unitId?: number }
 export interface CameraTarget { x: number; y: number; zoom: number }
 
 const EVENT_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'fire', 'destroyed']);
@@ -15,20 +16,20 @@ const EVENT_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'fire', 'destroye
  */
 export function createCamera(mapW: number, mapH: number) {
   let focus: Focus = { prio: Prio.None, x: mapW / 2, y: mapH / 2, until: 0 };
-  const gifts: { x: number; y: number; ms: number }[] = [];
+  const gifts: { x: number; y: number; ms: number; unitId?: number }[] = [];
   let joins: number[] = [];
   let lastAction = 0;
   let tourIndex = 0;
   const current = { x: mapW / 2, y: mapH / 2, zoom: 1 };
 
-  const set = (prio: Prio, x: number, y: number, until: number) => { focus = { prio, x, y, until }; lastAction = until; };
+  const set = (prio: Prio, x: number, y: number, until: number, unitId?: number) => { focus = { prio, x, y, until, unitId }; lastAction = until; };
   const free = (now: number) => focus.prio === Prio.None || now > focus.until;
 
   return {
     /** A gift effect at (x, y) lasting `ms`; queued behind a running gift event. */
-    gift(x: number, y: number, ms: number, now: number): void {
-      if (focus.prio === Prio.Gift && now <= focus.until) gifts.push({ x, y, ms });
-      else set(Prio.Gift, x, y, now + ms + CAMERA.giftHoldAfterMs);
+    gift(x: number, y: number, ms: number, now: number, unitId?: number): void {
+      if (focus.prio === Prio.Gift && now <= focus.until) gifts.push({ x, y, ms, unitId });
+      else set(Prio.Gift, x, y, now + ms + CAMERA.giftHoldAfterMs, unitId);
     },
 
     events(events: SimEvent[], now: number): void {
@@ -37,11 +38,13 @@ export function createCamera(mapW: number, mapH: number) {
         if (EVENT_KINDS.has(e.kind)) {
           if (focus.prio === Prio.Gift && now <= focus.until) continue;
           const near = focus.prio === Prio.Event && Math.abs(focus.x - e.x) + Math.abs(focus.y - e.y) <= CAMERA.eventMergeTiles;
-          if (near || free(now) || focus.prio > Prio.Event) set(Prio.Event, near ? focus.x : e.x, near ? focus.y : e.y, now + CAMERA.eventHoldMs);
+          // keep following the fighter we already watch; a fight elsewhere only takes over once this one is quiet
+          if (near) focus.until = now + CAMERA.eventHoldMs;
+          else if (free(now) || focus.prio > Prio.Event) set(Prio.Event, e.x, e.y, now + CAMERA.eventHoldMs, e.unitId);
         } else if (e.kind === 'join') {
           joins = joins.filter((t) => now - t < CAMERA.joinSpamWindowMs);
           joins.push(now);
-          if (joins.length <= CAMERA.joinSpamLimit && (free(now) || focus.prio >= Prio.Join)) set(Prio.Join, e.x, e.y, now + CAMERA.joinMs);
+          if (joins.length <= CAMERA.joinSpamLimit && (free(now) || focus.prio >= Prio.Join)) set(Prio.Join, e.x, e.y, now + CAMERA.joinMs, e.unitId);
         }
       }
     },
@@ -50,7 +53,7 @@ export function createCamera(mapW: number, mapH: number) {
     update(world: World, now: number, dtMs: number): CameraTarget {
       if (now > focus.until) {
         const next = gifts.shift();
-        if (next) set(Prio.Gift, next.x, next.y, now + next.ms + CAMERA.giftHoldAfterMs);
+        if (next) set(Prio.Gift, next.x, next.y, now + next.ms + CAMERA.giftHoldAfterMs, next.unitId);
         else if (focus.prio !== Prio.None) focus = { prio: Prio.None, x: mapW / 2, y: mapH / 2, until: 0 };
       }
       if (focus.prio === Prio.None && now - lastAction > CAMERA.tourEveryMs) {
@@ -61,6 +64,10 @@ export function createCamera(mapW: number, mapH: number) {
         const y = units.length ? units.reduce((s, u) => s + u.y, 0) / units.length : home.homeY;
         // busiest point: the tribe's centre of mass, pulled towards home so raiders do not drag the camera off
         set(Prio.Tour, (x + home.homeX) / 2, (y + home.homeY) / 2, now + CAMERA.tourMs);
+      }
+      if (focus.unitId !== undefined) {
+        const u = world.units.find((x) => x.id === focus.unitId);
+        if (u?.alive) { focus.x = u.x; focus.y = u.y; }
       }
       const zoomed = focus.prio !== Prio.None;
       const k = 1 - Math.exp(-dtMs / (CAMERA.easeMs / 3));

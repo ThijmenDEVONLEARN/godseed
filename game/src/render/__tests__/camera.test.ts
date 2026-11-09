@@ -46,3 +46,17 @@ describe('camera rules', () => {
     expect(cam.prio).toBe('Tour');
   });
 });
+
+describe('camera follow', () => {
+  it('follows the joined unit as it walks', () => {
+    const sim = createSimulation(6);
+    sim.enqueue({ kind: 'join', viewerId: 'v', name: 'Vera', team: 'red' });
+    const cam = createCamera(64, 72);
+    cam.events(sim.step(), 0);
+    const u = sim.world.units.find((x) => x.viewerId === 'v')!;
+    u.x += 5;
+    let c = cam.update(sim.world, 16, 16);
+    for (let t = 32; t < 2000; t += 16) c = cam.update(sim.world, t, 16);
+    expect(Math.round(c.x)).toBe(u.x);
+  });
+});

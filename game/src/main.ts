@@ -66,7 +66,7 @@ bridge.onEvent((e) => {
   if (e.type === 'gift' && e.coins >= 20) {
     const u = sim.world.units.find((x) => x.viewerId === e.viewer.id && x.alive);
     const home = sim.world.teams[u?.team ?? 'red'];
-    camera.gift(u?.x ?? home.homeX, u?.y ?? home.homeY, 5000, performance.now());
+    camera.gift(u?.x ?? home.homeX, u?.y ?? home.homeY, 5000, performance.now(), u?.id);
   }
 });
 

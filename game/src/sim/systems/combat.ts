@@ -20,7 +20,7 @@ export function damageUnit(world: World, target: Unit, amount: number, by?: Unit
   if (by) {
     by.kills++;
     world.teams[by.team].kills++;
-    emit(world, { kind: 'kill', team: by.team, text: `${by.name ? `${by.name} (${by.team})` : `A ${by.team} ${by.role}`} slew ${who}`, x: target.x, y: target.y });
+    emit(world, { kind: 'kill', team: by.team, unitId: by.id, text: `${by.name ? `${by.name} (${by.team})` : `A ${by.team} ${by.role}`} slew ${who}`, x: target.x, y: target.y });
   } else {
     emit(world, { kind: 'death', team: target.team, text: `${who} ${cause}`, x: target.x, y: target.y });
   }

@@ -165,7 +165,7 @@ export function jobs(world: World, walls: Map<number, Team>): void {
         const goal = target.y * world.w + target.x;
         if (!u.path || (u.pathGoal !== goal && world.tick % 10 === u.id % 10)) {
           u.path = undefined;
-          if (requestPath(world, u, goal, u.team, walls) === 'fail') retarget(world, u, job.team);
+          if (requestPath(world, u, goal, u.team, walls) === 'fail') u.job = { kind: 'idle' }; // unreachable: give up instead of retrying the same target forever
         }
         break;
       }
@@ -229,8 +229,10 @@ export function retarget(world: World, u: Unit, team: Team): void {
   let unit: Unit | undefined;
   for (const e of world.units) if (e.alive && e.team === team && dist(e, u) <= 8 && (!unit || dist(e, u) < dist(unit, u))) unit = e;
   if (unit) { u.job = { kind: 'attack', team, targetId: unit.id, targetIsUnit: true }; return; }
+  // viewers only finish the fight around them, then go back to their own order; raiders push on to the enemy village
+  const reach = u.viewerId ? 8 : Infinity;
   let b: Building | undefined;
-  for (const x of world.buildings) if (x.alive && x.team === team && x.type !== 'wall' && (!b || dist(x, u) < dist(b, u))) b = x;
+  for (const x of world.buildings) if (x.alive && x.team === team && x.type !== 'wall' && dist(x, u) <= reach && (!b || dist(x, u) < dist(b, u))) b = x;
   if (b) { u.job = { kind: 'attack', team, targetId: b.id, targetIsUnit: false }; return; }
   u.path = undefined;
   u.job = u.viewerId ? { kind: 'idle' } : { kind: 'defend' };
