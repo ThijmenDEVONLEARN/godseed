@@ -13,6 +13,7 @@ import type { SimEvent, World } from './sim/types';
 import { createHud } from './ui/Hud';
 import { MAP_TILES, SCREEN, TILE, ZONES } from './ui/layout';
 import { createDebug } from './ui/debug';
+import { createSpeaker, lineFor } from './voice/speaker';
 
 TextureStyle.defaultOptions.scaleMode = 'nearest';
 
@@ -47,6 +48,8 @@ const hud = createHud(ui);
 const debug = createDebug(ui);
 
 const bridge = createBridgeClient(params.get('bridge') ?? `ws://${location.hostname || 'localhost'}:8765`);
+// local Kokoro voice (tts/server.py); ?voice=off silences it, ?voice=am_michael picks another voice
+const speaker = params.get('voice') === 'off' ? undefined : createSpeaker({ url: params.get('tts') ?? 'http://127.0.0.1:8880', voice: params.get('voice') ?? 'af_heart' });
 bridge.onStatus((up) => hud.connected(up));
 bridge.onHighscores((rounds) => hud.setHighscores(rounds));
 const route = createCommandRouter(sim, {
@@ -75,6 +78,8 @@ function onEvents(world: World, events: SimEvent[]): void {
     if (e.kind === 'join' && e.unitId !== undefined && e.team) view.point(e.unitId, PALETTE.team[e.team]);
     if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y);
     if (e.kind === 'roundEnd' && e.team) bridge.send(roundEnd(world, e.team));
+    const line = speaker && lineFor(world, e);
+    if (line) speaker.say(line);
   }
 }
 
