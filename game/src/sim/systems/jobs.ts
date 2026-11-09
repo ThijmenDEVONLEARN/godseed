@@ -37,12 +37,32 @@ function goTo(world: World, u: Unit, goal: number, walls: Map<number, Team>): bo
 /** Picks a new job for an idle villager. */
 export function chooseJob(world: World, u: Unit): void {
   const team = world.teams[u.team];
+  if (u.order) { followOrder(world, u); return; }
   if (u.role === 'warrior' || u.role === 'leader') { u.job = { kind: 'defend' }; return; }
   const site = nextConstruction(world, u.team, u);
   const builders = site ? world.units.filter((o) => o.alive && o.job.kind === 'build' && o.job.targetId === site.id).length : 0;
   if (site && builders < 3) { u.job = { kind: 'build', targetId: site.id }; return; }
   const res = team.focus[u.id % team.focus.length] ?? 'wood';
   startGather(world, u, res);
+}
+
+function followOrder(world: World, u: Unit): void {
+  switch (u.order) {
+    case 'chop': return startGather(world, u, 'wood');
+    case 'mine': return startGather(world, u, mineTarget(world, u));
+    case 'farm': return startGather(world, u, 'food');
+    case 'defend': u.job = { kind: 'defend' }; return;
+    case 'march': u.job = { kind: 'guard', x: world.w >> 1, y: world.h >> 1 }; return;
+    case 'pray': u.job = { kind: 'pray', workLeft: BALANCE.pray.everyTicks }; return;
+  }
+}
+
+/** Miners go for ore when the tribe still needs it, otherwise stone. */
+function mineTarget(world: World, u: Unit): Resource {
+  const s = world.teams[u.team].stock;
+  if (s.iron < 5 && !buildingsOf(world, u.team, 'smithy').length) return 'iron';
+  if (s.gold < 10 && !buildingsOf(world, u.team, 'temple').length) return 'gold';
+  return 'stone';
 }
 
 export function startGather(world: World, u: Unit, res: Resource): void {
@@ -145,8 +165,24 @@ export function jobs(world: World, walls: Map<number, Team>): void {
         const goal = target.y * world.w + target.x;
         if (!u.path || (u.pathGoal !== goal && world.tick % 10 === u.id % 10)) {
           u.path = undefined;
-          if (requestPath(world, u, goal, u.team, walls) === 'fail') retarget(world, u, job.team);
+          if (requestPath(world, u, goal, u.team, walls) === 'fail') u.job = { kind: 'idle' }; // unreachable: give up instead of retrying the same target forever
         }
+        break;
+      }
+      case 'guard': {
+        const enemy = world.units.find((e) => e.alive && e.team !== u.team && Math.abs(e.x - job.x) + Math.abs(e.y - job.y) <= BALANCE.guardRadius);
+        if (enemy) u.job = { kind: 'attack', team: enemy.team, targetId: enemy.id, targetIsUnit: true };
+        else if (Math.abs(u.x - job.x) + Math.abs(u.y - job.y) > 2 && !u.path) goTo(world, u, guardSpot(world, job.x, job.y), walls);
+        break;
+      }
+      case 'pray': {
+        const temple = buildingsOf(world, u.team, 'temple').find((b) => b.progress >= 1);
+        const goal = temple ? buildSpot(world, temple) ?? homeIdx(world, u.team) : homeIdx(world, u.team);
+        if (temple ? dist(u, temple) > 1 : u.y * world.w + u.x !== goal) { if (!u.path) goTo(world, u, goal, walls); break; }
+        u.path = undefined;
+        if (--job.workLeft > 0) break;
+        job.workLeft = BALANCE.pray.everyTicks;
+        world.teams[u.team].faith += temple ? BALANCE.pray.templeFaith : BALANCE.pray.faith;
         break;
       }
       case 'defend': {
@@ -166,6 +202,17 @@ export function jobs(world: World, walls: Map<number, Team>): void {
   }
 }
 
+/** Nearest walkable land tile to (x, y), searching outwards. */
+function guardSpot(world: World, x: number, y: number): number {
+  for (let r = 0; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const tx = x + dx, ty = y + dy;
+    if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) continue;
+    const t = world.tiles[idx(world.w, tx, ty)];
+    if (t !== Tile.Water && t !== Tile.DeepWater && t !== Tile.Mountain) return idx(world.w, tx, ty);
+  }
+  return idx(world.w, x, y);
+}
+
 /** A walkable tile next to (or on) a building. */
 function buildSpot(world: World, b: Building): number | undefined {
   for (const [dx, dy] of [[0, 0], [0, 1], [1, 0], [-1, 0], [0, -1]]) {
@@ -182,9 +229,11 @@ export function retarget(world: World, u: Unit, team: Team): void {
   let unit: Unit | undefined;
   for (const e of world.units) if (e.alive && e.team === team && dist(e, u) <= 8 && (!unit || dist(e, u) < dist(unit, u))) unit = e;
   if (unit) { u.job = { kind: 'attack', team, targetId: unit.id, targetIsUnit: true }; return; }
+  // viewers only finish the fight around them, then go back to their own order; raiders push on to the enemy village
+  const reach = u.viewerId ? 8 : Infinity;
   let b: Building | undefined;
-  for (const x of world.buildings) if (x.alive && x.team === team && x.type !== 'wall' && (!b || dist(x, u) < dist(b, u))) b = x;
-  if (b && dist(b, u) <= 30) { u.job = { kind: 'attack', team, targetId: b.id, targetIsUnit: false }; return; }
+  for (const x of world.buildings) if (x.alive && x.team === team && x.type !== 'wall' && dist(x, u) <= reach && (!b || dist(x, u) < dist(b, u))) b = x;
+  if (b) { u.job = { kind: 'attack', team, targetId: b.id, targetIsUnit: false }; return; }
   u.path = undefined;
   u.job = u.viewerId ? { kind: 'idle' } : { kind: 'defend' };
 }

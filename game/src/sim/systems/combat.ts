@@ -1,5 +1,6 @@
 import { BALANCE } from '../../config/balance';
 import { completeOf, dist, emit } from '../entities';
+import { ignite } from './fire';
 import { setTile } from '../grid';
 import { Tile, type Building, type Team, type Unit, type World } from '../types';
 
@@ -15,11 +16,11 @@ export function damageUnit(world: World, target: Unit, amount: number, by?: Unit
   target.alive = false;
   target.path = undefined;
   if (target.viewerId) target.respawnAt = world.tick + BALANCE.unit.viewerRespawnTicks;
-  const who = target.name ?? `a ${target.team} villager`;
+  const who = target.name ? `${target.name} (${target.team})` : `a ${target.team} villager`;
   if (by) {
     by.kills++;
     world.teams[by.team].kills++;
-    emit(world, { kind: 'kill', team: by.team, text: `${by.name ?? `A ${by.team} ${by.role}`} slew ${who}`, x: target.x, y: target.y });
+    emit(world, { kind: 'kill', team: by.team, unitId: by.id, text: `${by.name ? `${by.name} (${by.team})` : `A ${by.team} ${by.role}`} slew ${who}`, x: target.x, y: target.y });
   } else {
     emit(world, { kind: 'death', team: target.team, text: `${who} ${cause}`, x: target.x, y: target.y });
   }
@@ -50,7 +51,10 @@ export function combat(world: World): void {
       } else {
         const targetId = u.job.targetId;
         const b = world.buildings.find((x) => x.id === targetId);
-        if (b?.alive && dist(u, b) <= 1) { damageBuilding(world, b, unitDamage(world, u), u.team); hit = true; }
+        if (b?.alive && dist(u, b) <= 1) {
+          if (u.job.burn && b.type !== 'wall') { ignite(world, b); u.job = { kind: 'idle' }; } else damageBuilding(world, b, unitDamage(world, u), u.team);
+          hit = true;
+        }
       }
     }
     if (!hit) {

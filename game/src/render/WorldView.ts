@@ -1,4 +1,4 @@
-import { Container, Sprite, Text, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { Animal, Building, Mover, Unit, World } from '../sim/types';
 import { T, drawTile, type Art } from './art';
 import { PALETTE } from './palette';
@@ -16,7 +16,11 @@ export class WorldView {
   private sprites = new Map<number, Sprite>();
   private names = new Map<number, Text>();
   private fires: Sprite[] = [];
+  private bubbles = new Map<number, { box: Container; until: number }>();
+  private arrows = new Map<number, { g: Graphics; until: number }>();
   private seed = NaN;
+  /** Labels and bubbles shrink while zoomed in so they stay about the same size on screen. */
+  labelScale = 1;
 
   constructor(private art: Art, w: number, h: number) {
     this.canvas.width = w * T;
@@ -36,7 +40,33 @@ export class WorldView {
     for (const a of world.animals) if (a.alive) { seen.add(a.id); this.animal(a, now); }
     for (const [id, s] of this.sprites) if (!seen.has(id)) { s.destroy(); this.sprites.delete(id); }
     for (const [id, t] of this.names) if (!seen.has(id)) { t.destroy(); this.names.delete(id); }
+    const ms = performance.now();
+    for (const [id, b] of this.bubbles) if (!seen.has(id) || ms > b.until) { b.box.destroy({ children: true }); this.bubbles.delete(id); }
+    for (const [id, a] of this.arrows) if (!seen.has(id) || ms > a.until) { a.g.destroy(); this.arrows.delete(id); }
     this.syncFires(world, now);
+  }
+
+  /** Speech bubble above a unit for a few seconds. */
+  say(unitId: number, text: string, ms = 3000): void {
+    this.bubbles.get(unitId)?.box.destroy({ children: true });
+    const t = new Text({ text, style: { fontFamily: PALETTE.font, fontWeight: '700', fontSize: 34, fill: PALETTE.outline } });
+    t.anchor.set(0.5, 1);
+    t.y = -10;
+    const bg = new Graphics()
+      .roundRect(-t.width / 2 - 12, -t.height - 18, t.width + 24, t.height + 12, 8).fill('#ffffff').stroke({ color: PALETTE.outline, width: 4 })
+      .poly([-8, -7, 8, -7, 0, 6]).fill('#ffffff');
+    const box = new Container();
+    box.addChild(bg, t);
+    this.labels.addChild(box);
+    this.bubbles.set(unitId, { box, until: performance.now() + ms });
+  }
+
+  /** Blinking arrow above a unit, for !me and right after a join. */
+  point(unitId: number, color: string, ms = 3000): void {
+    this.arrows.get(unitId)?.g.destroy();
+    const g = new Graphics().poly([-16, -24, 16, -24, 0, 0]).fill(color).stroke({ color: PALETTE.outline, width: 4 });
+    this.labels.addChild(g);
+    this.arrows.set(unitId, { g, until: performance.now() + ms });
   }
 
   private syncGround(world: World): void {
@@ -84,6 +114,11 @@ export class WorldView {
     const s = this.sprite(u.id, this.art.unit(u.team, u.role, frame), 0.5, 49.5 / 60);
     s.position.set(p.x, p.y);
     s.zIndex = p.y + 1;
+    const bubble = this.bubbles.get(u.id), arrow = this.arrows.get(u.id);
+    const ls = this.labelScale;
+    bubble?.box.position.set(p.x, p.y - 56 - (u.name ? 48 * ls : 0));
+    bubble?.box.scale.set(ls);
+    if (arrow) { arrow.g.scale.set(ls); arrow.g.position.set(p.x, p.y - 56 - (u.name ? 48 * ls : 0) - (bubble ? 64 * ls : 0)); arrow.g.visible = Math.floor(performance.now() / 250) % 2 === 0; }
     if (!u.name) return;
     let label = this.names.get(u.id);
     if (!label) {
@@ -92,6 +127,8 @@ export class WorldView {
       this.names.set(u.id, label);
       this.labels.addChild(label);
     }
+    if (label.text !== u.name) label.text = u.name;
+    label.scale.set(ls);
     label.position.set(p.x, p.y - 56);
   }
 

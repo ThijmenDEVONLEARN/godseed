@@ -1,5 +1,6 @@
 import type { Team } from '@godseed/shared';
 import type { Rng } from './rng';
+import type { VoteId } from '../config/votes';
 
 export type { Team };
 
@@ -9,12 +10,16 @@ export enum Deposit { None, Tree, Stone, Iron, Gold }
 export type Resource = 'wood' | 'stone' | 'food' | 'gold' | 'iron';
 export type BuildingType = 'hut' | 'farm' | 'wall' | 'tower' | 'smithy' | 'temple' | 'bridge';
 export type Role = 'worker' | 'warrior' | 'viewer' | 'leader';
+/** Standing order a viewer gave with a chat command; their unit goes back to it whenever it is idle. */
+export type Order = 'chop' | 'mine' | 'farm' | 'defend' | 'march' | 'pray';
 
 export type Job =
   | { kind: 'idle' }
   | { kind: 'gather'; res: Resource; stage: 'go' | 'work' | 'return'; tx: number; ty: number; workLeft: number }
   | { kind: 'build'; targetId: number }
-  | { kind: 'attack'; team: Team; targetId: number; targetIsUnit: boolean }
+  | { kind: 'attack'; team: Team; targetId: number; targetIsUnit: boolean; burn?: boolean }
+  | { kind: 'guard'; x: number; y: number }
+  | { kind: 'pray'; workLeft: number }
   | { kind: 'defend' }
   | { kind: 'hunt'; targetId: number; stage: 'go' | 'return' };
 
@@ -41,6 +46,7 @@ export interface Unit extends Mover {
   role: Role;
   name?: string;
   viewerId?: string;
+  order?: Order;
   hunger: number;
   carrying?: { res: Resource; amount: number };
   job: Job;
@@ -86,7 +92,7 @@ export interface TeamState {
   alive: boolean;
 }
 
-export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire' | 'join';
+export type SimEventKind = 'build' | 'built' | 'destroyed' | 'death' | 'kill' | 'birth' | 'raid' | 'storm' | 'roundEnd' | 'newRound' | 'noPath' | 'fire' | 'join' | 'info';
 
 export interface SimEvent {
   tick: number;
@@ -95,6 +101,7 @@ export interface SimEvent {
   text: string;
   x?: number;
   y?: number;
+  unitId?: number;
 }
 
 export interface RoundState {
@@ -128,4 +135,6 @@ export interface World {
   round: RoundState;
   pathBudget: number;
   stormUntil: number;
+  /** Open world vote: options, one ballot per viewer (last one counts), closing tick. */
+  vote?: { options: VoteId[]; ballots: Record<string, 1 | 2 | 3>; until: number };
 }

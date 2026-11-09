@@ -40,6 +40,9 @@ export const BALANCE = {
   tower: { range: 6, damage: 3, everyTicks: 10 },
   fire: { buildingDamagePerTick: 0.5, checkEveryTicks: 10, spreadChance: 0.15, putOutChance: 0.04, forestBurnTicks: 30, burntRegrowTicks: 3000 },
 
+  pray: { everyTicks: 30, faith: 1, templeFaith: 2 },
+  guardRadius: 5,
+
   brain: { everyTicks: 50, raidEveryTicks: 1500, raidChance: 0.3, raidWorkerShare: 0.2, threatMemoryTicks: 200, defendRadius: 6 },
 
   animals: { sheepStart: 14, sheepFood: 5, wolfEveryTicks: 1000, wolfMax: 6, wolfHp: 20, wolfDamage: 3, wolfAggroRange: 5, sheepHp: 6 },
