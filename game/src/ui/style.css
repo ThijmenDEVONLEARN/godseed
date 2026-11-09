@@ -32,3 +32,9 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .dot.up { background: #38d16a; }
 .board-row.small { font-size: 30px; line-height: 40px; }
 .topbar .sub.vote { color: #ffe066; font-weight: 700; }
+.showcase { position: absolute; top: 250px; left: 90px; right: 90px; padding: 28px 36px; background: rgba(16, 20, 28, .95); border: 8px solid #ffe066; text-align: center; font-size: 46px; line-height: 58px; color: #fff; text-shadow: 3px 3px 0 #111; }
+.showcase.big { font-size: 56px; line-height: 68px; }
+.showcase.pop { animation: pop .35s ease-out; }
+.showcase.big.pop { animation: pop .35s ease-out, shake .5s .35s 3; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-8px, 4px); } 75% { transform: translate(8px, -4px); } }

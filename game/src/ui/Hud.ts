@@ -6,7 +6,7 @@ import { GIFTS } from '../config/gifts';
 import { PALETTE } from '../render/palette';
 import type { SimEvent, World } from '../sim/types';
 
-const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm', 'info']);
+const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm', 'info', 'god', 'leader']);
 
 const el = (tag: string, cls: string, parent: HTMLElement, text = '') => {
   const e = document.createElement(tag);
@@ -49,7 +49,24 @@ export function createHud(ui: HTMLElement) {
     el('span', 'coins', row, coins);
     el('span', '', row, label);
   }
-  el('div', 'social', bottom, GIFTS.social.join('   ·   '));
+  const social = el('div', 'social', bottom, GIFTS.social.join('   ·   '));
+  const showcase = el('div', 'showcase', ui);
+  showcase.hidden = true;
+  const queue: { text: string; team?: Team; big: boolean }[] = [];
+  let showing = false;
+  const next = () => {
+    const item = queue.shift();
+    if (!item) { showcase.hidden = true; showing = false; return; }
+    showing = true;
+    showcase.hidden = false;
+    showcase.textContent = item.text;
+    showcase.style.borderColor = item.team ? PALETTE.team[item.team] : '#ffe066';
+    showcase.classList.toggle('big', item.big);
+    showcase.classList.remove('pop');
+    void showcase.offsetWidth; // restart the pop animation
+    showcase.classList.add('pop');
+    setTimeout(next, item.big ? 6000 : 4000);
+  };
   const feed = el('div', 'feed', bottom);
 
   const board = el('div', 'board', ui);
@@ -64,6 +81,9 @@ export function createHud(ui: HTMLElement) {
   let highscores: RoundEnd[] = [];
   return {
     feed: line,
+    likes(total: number): void {
+      social.textContent = `${GIFTS.social.join('   ·   ')}   ·   likes ${total % GIFTS.likesPerRain}/${GIFTS.likesPerRain}`;
+    },
     connected(up: boolean): void { dot.classList.toggle('up', up); },
     setHighscores(rounds: RoundEnd[]): void { highscores = rounds; },
     update(world: World): void {
@@ -85,6 +105,10 @@ export function createHud(ui: HTMLElement) {
         if (!FEED_KINDS.has(e.kind) || (e.kind === 'storm' && e.x !== undefined)) continue;
         line(e.text, e.team);
         if (e.kind === 'roundEnd') showBoard(world);
+        if (e.kind === 'god' || e.kind === 'leader') {
+          queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' });
+          if (!showing) next();
+        }
       }
     },
   };

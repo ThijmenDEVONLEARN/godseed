@@ -1,4 +1,5 @@
-import { hasBadWord, type Team, type ViewerEvent } from '@godseed/shared';
+import { cleanName, hasBadWord, type Team, type ViewerEvent } from '@godseed/shared';
+import { GIFTS } from '../config/gifts';
 import { viewerUnit } from '../sim/commands';
 import type { Simulation } from '../sim/Simulation';
 import { createCooldown } from './cooldown';
@@ -11,12 +12,15 @@ export interface CommandSinks {
   /** Arrow and stats bubble above a unit, for !me. */
   highlight(unitId: number): void;
   vote(viewerId: string, option: 1 | 2 | 3): void;
+  /** Like total, for the rain progress bar. */
+  likes(total: number): void;
 }
 
 /** Turns viewer events into sim commands and on-screen feedback. Gifts, likes, follows and shares get effects in phase 3. */
 export function createCommandRouter(sim: Simulation, out: CommandSinks) {
   const cooldown = createCooldown();
   const welcomed = new Set<string>();
+  let likes = 0;
   return (e: ViewerEvent, now = Date.now()): void => {
     const w = sim.world;
     switch (e.type) {
@@ -40,9 +44,16 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
         welcomed.add(e.viewer.id);
         out.feed(`Welcome ${e.viewer.name}! Type !join to play`);
         return;
-      case 'follow': out.feed(`${e.viewer.name} followed!`); return;
-      case 'share': out.feed(`${e.viewer.name} shared the stream!`); return;
-      case 'gift': out.feed(`${e.viewer.name} sent ${e.giftName} (${e.coins} coins)`); return;
+      case 'follow': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'baby' }); return;
+      case 'share': sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'goldChest' }); return;
+      case 'gift': sim.enqueue({ kind: 'gift', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), coins: e.coins, giftId: e.giftId }); return;
+      case 'like': {
+        const before = Math.floor(likes / GIFTS.likesPerRain);
+        likes += e.count;
+        out.likes(likes);
+        if (Math.floor(likes / GIFTS.likesPerRain) > before) sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'rain' });
+        return;
+      }
       default: return;
     }
   };
