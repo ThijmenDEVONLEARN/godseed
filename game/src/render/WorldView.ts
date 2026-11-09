@@ -21,6 +21,8 @@ export class WorldView {
   private rain = new Graphics();
   private bubbles = new Map<number, { box: Container; until: number }>();
   private arrows = new Map<number, { g: Graphics; until: number }>();
+  private boltId = 0;
+  private flashUntil = 0;
   private seed = NaN;
   /** Labels and bubbles shrink while zoomed in so they stay about the same size on screen. */
   labelScale = 1;
@@ -47,7 +49,7 @@ export class WorldView {
     for (const [id, t] of this.names) if (!seen.has(id)) { t.destroy(); this.names.delete(id); }
     const ms = performance.now();
     for (const [id, b] of this.bubbles) if (!seen.has(id) || ms > b.until) { b.box.destroy({ children: true }); this.bubbles.delete(id); }
-    for (const [id, a] of this.arrows) if (!seen.has(id) || ms > a.until) { a.g.destroy(); this.arrows.delete(id); }
+    for (const [id, a] of this.arrows) if ((id >= 0 && !seen.has(id)) || ms > a.until) { a.g.destroy(); this.arrows.delete(id); }
     this.syncFires(world, now);
     this.syncBeasts(world, now);
     this.syncRain(world, now);
@@ -74,6 +76,7 @@ export class WorldView {
 
   private syncRain(world: World, now: number): void {
     this.rain.clear();
+    if (performance.now() < this.flashUntil) this.rain.rect(0, 0, world.w * T, world.h * T).fill({ color: '#ffffff', alpha: 0.3 });
     for (const e of world.effects) {
       const fade = Math.min(1, (e.until - now) / 20); // ease out over the last 2 s
       if (e.kind === 'eclipse') this.rain.rect(0, 0, world.w * T, world.h * T).fill({ color: '#0a0820', alpha: 0.65 * fade });
@@ -110,6 +113,18 @@ export class WorldView {
     box.addChild(bg, t);
     this.labels.addChild(box);
     this.bubbles.set(unitId, { box, until: performance.now() + ms });
+  }
+
+  /** A lightning bolt striking tile (x, y), gone after `ms`. */
+  bolt(x: number, y: number, ms = 350): void {
+    const cx = x * T + T / 2, top = y * T - 6 * T;
+    const pts = [cx, top];
+    for (let i = 1; i <= 6; i++) pts.push(cx + (i % 2 ? 14 : -14) * (i < 6 ? 1 : 0), top + i * T);
+    const g = new Graphics().poly(pts, false).stroke({ color: '#fffbe0', width: 7 }).stroke({ color: '#9fd8ff', width: 3 })
+      .circle(cx, y * T + T, T * 0.9).fill({ color: '#fff7c0', alpha: 0.5 });
+    this.labels.addChild(g);
+    this.flashUntil = performance.now() + 120; // whole-map flash, so a strike off-camera is still felt
+    this.arrows.set(-(this.boltId++ % 1000) - 1, { g, until: performance.now() + ms }); // negative ids: not tied to a unit, only expire by time
   }
 
   /** Blinking arrow above a unit, for !me and right after a join. */

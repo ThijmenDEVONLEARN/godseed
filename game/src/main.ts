@@ -73,6 +73,7 @@ function onEvents(world: World, events: SimEvent[]): void {
   }
   for (const e of events) {
     if (e.kind === 'join' && e.unitId !== undefined && e.team) view.point(e.unitId, PALETTE.team[e.team]);
+    if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y);
     if (e.kind === 'roundEnd' && e.team) bridge.send(roundEnd(world, e.team));
   }
 }
