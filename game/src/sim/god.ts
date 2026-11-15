@@ -6,6 +6,7 @@ import { idx, inBounds, isLand, setTile } from './grid';
 import { reachable } from './worldgen/generate';
 import { damageBuilding, damageUnit } from './systems/combat';
 import { ignite, igniteTile } from './systems/fire';
+import { retarget } from './systems/jobs';
 import { newVillager } from './systems/population';
 import { STORM, survived } from './systems/round';
 import { Deposit, Tile, type ActiveEffect, type Unit, type World } from './types';
@@ -79,6 +80,7 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
   switch (effect) {
     case 'spawnTrees': case 'spawnStone': {
       const isTree = effect === 'spawnTrees';
+      home.stock[isTree ? 'wood' : 'stone'] += G.spawnStock;
       for (let i = 0; i < G.spawnCount; i++) {
         const p = landNear(world, home.homeX, home.homeY, 8, freeTile);
         if (!p) continue;
@@ -91,13 +93,20 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
       break;
     }
     case 'spawnSheep':
+      home.stock.food += G.spawnStock;
       for (let i = 0; i < G.spawnCount; i++) { const p = landNear(world, home.homeX, home.homeY, 6); if (p) spawnAnimal(world, 'sheep', ...p); }
       break;
     case 'weapon': case 'shield':
-      if (!unit) { applyGod(world, 'spawnSheep', team, byName); return; }
-      unit.buff = { kind: effect, until: world.tick + G.buffTicks };
-      if (effect === 'shield') unit.hp = unit.maxHp;
-      at = unit;
+      // the whole tribe: swords for everyone who fights, the shield for everyone plus repairs
+      for (const u of aliveUnitsOf(world, team)) {
+        if (effect === 'weapon' && u.role === 'worker' && u !== unit) continue;
+        u.buff = { kind: effect, until: world.tick + G.buffTicks };
+        if (effect === 'shield') u.hp = u.maxHp;
+      }
+      if (effect === 'shield') for (const b of buildingsOf(world, team)) { b.hp = Math.min(b.maxHp, b.hp + G.shieldRepair); b.burning = false; }
+      // fresh swords go straight to the leading tribe; viewers keep following their own orders
+      if (effect === 'weapon') { target = enemy; for (const u of aliveUnitsOf(world, team)) if (u.role === 'warrior' && !u.viewerId) retarget(world, u, enemy); }
+      if (unit) at = unit;
       break;
     case 'lightning': {
       target = enemy;
@@ -111,14 +120,23 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
     }
     case 'meteor': target = enemy; at = meteor(world, eh.homeX + world.rng.int(7) - 3, eh.homeY + world.rng.int(7) - 3, team); ticks = 60; break;
     case 'meteorShower':
-      for (const t of TEAMS) meteor(world, world.teams[t].homeX + world.rng.int(9) - 4, world.teams[t].homeY + world.rng.int(9) - 4);
+      for (const t of TEAMS) if (t !== team) meteor(world, world.teams[t].homeX + world.rng.int(9) - 4, world.teams[t].homeY + world.rng.int(9) - 4, team);
       at = { x: cx, y: cy }; ticks = 60;
       break;
     case 'wolfPack': case 'eclipse': {
       target = effect === 'eclipse' ? team : enemy;
-      const n = effect === 'eclipse' ? 10 : G.wolfPack;
+      const n = effect === 'eclipse' ? 9 : G.wolfPack;
       const around = effect === 'eclipse' ? { x: cx, y: cy } : { x: eh.homeX, y: eh.homeY };
-      for (let i = 0; i < n; i++) { const p = landNear(world, around.x, around.y, effect === 'eclipse' ? 20 : 7); if (p) spawnAnimal(world, 'wolf', ...p); }
+      // a pack comes out right at the edge of the village; the eclipse sends a few to every tribe but the giver's
+      const dens = effect === 'eclipse' ? TEAMS.filter((t) => t !== team).map((t) => world.teams[t]) : [eh];
+      for (const d of dens) for (let i = 0; i < n / dens.length; i++) {
+        const p = landNear(world, d.homeX, d.homeY, 4);
+        if (!p) continue;
+        const wolf = spawnAnimal(world, 'wolf', ...p);
+        wolf.hp = wolf.maxHp = G.packWolfHp; // sent by a god: tougher than a forest wolf
+      }
+      // the sun goes dark and the crops of every other tribe fail
+      if (effect === 'eclipse') for (const d of dens) d.stock.food = Math.floor(d.stock.food / 2);
       at = around; ticks = 100;
       // render-only markers: the eclipse darkens the sky, the flood shows water over the village
       if (effect === 'eclipse') world.effects.push({ kind: 'eclipse', team, until: world.tick + 200, x: cx, y: cy, dx: 0, dy: 0, byName });
@@ -135,30 +153,42 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
       target = effect === 'goldenAge' ? team : enemy;
       const kind = effect === 'titanWalk' ? 'titan' : effect;
       const t = world.teams[target];
-      const start = kind === 'titan' ? { x: 0, y: cy } : kind === 'tornado' ? { x: t.homeX - 12, y: t.homeY - 4 } : { x: t.homeX, y: t.homeY };
+      const start = kind === 'titan' ? { x: t.homeX < cx ? world.w - 1 : 0, y: t.homeY } : kind === 'tornado' ? { x: t.homeX - 12, y: t.homeY - 4 } : { x: t.homeX, y: t.homeY };
       ticks = kind === 'dragon' ? G.dragonTicks : kind === 'plague' ? G.plagueTicks : kind === 'goldenAge' ? G.goldenAgeTicks : kind === 'tornado' ? 240 : 640;
-      const step = kind === 'titan' ? 0.1 : kind === 'tornado' ? 0.1 : 0;
+      const step = kind === 'titan' ? (t.homeX < cx ? -0.1 : 0.1) : kind === 'tornado' ? 0.1 : 0;
       if (kind !== 'goldenAge' && kind !== 'plague') moving = kind;
-      world.effects.push({ kind, team: target, until: world.tick + ticks, x: Math.max(0, start.x), y: start.y, dx: step, dy: kind === 'tornado' ? 0.03 : 0, byName });
+      // the titan remembers whom to spare (the giver); every other effect remembers whom it hits
+      world.effects.push({ kind, team: kind === 'titan' ? team : target, until: world.tick + ticks, x: Math.max(0, start.x), y: start.y, dx: step, dy: kind === 'tornado' ? 0.03 : 0, byName });
       at = start;
       if (kind === 'goldenAge' || kind === 'plague') ticks = 60;
       if (kind === 'titan') ticks = 300; // the camera walks along for 30 s, then the titan keeps going on its own
       break;
     }
-    case 'volcano': at = volcano(world); ticks = 80; break;
+    case 'volcano': target = enemy; at = volcano(world, eh, team); ticks = 80; break;
     case 'flood': {
       target = enemy;
       for (const b of buildingsOf(world, enemy, 'farm')) damageBuilding(world, b, 1000, team);
-      eh.stock.food = Math.floor(eh.stock.food / 2);
-      for (const u of aliveUnitsOf(world, enemy)) if (world.tiles[idx(world.w, u.x, u.y)] === Tile.Sand || world.tiles[idx(world.w, u.x, u.y)] === Tile.Farmland) damageUnit(world, u, 20, undefined, 'was swept away');
+      for (const b of buildingsOf(world, enemy)) if (b.alive && b.type !== 'wall' && dist(b, { x: eh.homeX, y: eh.homeY }) <= G.floodRadius + 4) { damageBuilding(world, b, G.floodDamage, team); b.burning = false; }
+      eh.stock.food = 0;
+      eh.stock.wood = Math.floor(eh.stock.wood / 2);
+      for (const u of aliveUnitsOf(world, enemy)) if (dist(u, { x: eh.homeX, y: eh.homeY }) <= G.floodRadius) damageUnit(world, u, 15, undefined, 'was swept away');
       at = { x: eh.homeX, y: eh.homeY }; ticks = 60;
       world.effects.push({ kind: 'flood', team: enemy, until: world.tick + 150, x: eh.homeX, y: eh.homeY, dx: 0, dy: 0, byName });
       break;
     }
-    case 'rainOfGold': for (const t of TEAMS) world.teams[t].stock.gold += G.rainOfGold; at = { x: cx, y: cy }; break;
-    case 'rain': world.rainUntil = world.tick + G.rainTicks; at = { x: cx, y: cy }; break;
+    case 'rainOfGold':
+      for (const t of TEAMS) world.teams[t].stock.gold += G.rainOfGold;
+      for (const r of ['wood', 'stone', 'food', 'gold', 'iron'] as const) home.stock[r] += G.rainOfGoldBonus;
+      at = { x: cx, y: cy };
+      break;
+    case 'rain':
+      world.rainUntil = world.tick + G.rainTicks;
+      for (const t of TEAMS) world.teams[t].stock.food += G.rainFood;
+      for (const k of world.regrowTiles.keys()) world.regrowTiles.set(k, world.tick); // burnt land greens up at once
+      at = { x: cx, y: cy };
+      break;
     case 'baby': { const b = newVillager(world, team); at = b; break; }
-    case 'goldChest': home.stock.gold += G.goldChest; break;
+    case 'goldChest': for (const r of ['wood', 'stone', 'food', 'gold', 'iron'] as const) home.stock[r] += G.goldChest; break;
   }
   const global = effect === 'eclipse' || effect === 'meteorShower' || effect === 'rainOfGold' || effect === 'titanWalk' || effect === 'rain';
   const text = global ? `${byName} ${EFFECT_TEXT[effect]}!` : `${byName} ${EFFECT_TEXT[effect]} ${cap(target)}!`;
@@ -179,11 +209,13 @@ function meteor(world: World, x: number, y: number, by?: Team): { x: number; y: 
   return { x, y };
 }
 
-/** A small mountain near the centre with a burning ring; skipped where it would cut a tribe off. */
-function volcano(world: World): { x: number; y: number } {
+/** A small mountain between the centre and the target village, with a burning ring; skipped where it would cut a tribe off. */
+function volcano(world: World, near: { homeX: number; homeY: number }, by: Team): { x: number; y: number } {
   const cx = world.w >> 1, cy = world.h >> 1, r = G.volcanoRadius;
-  for (let tries = 0; tries < 8; tries++) {
-    const x = cx + world.rng.int(13) - 6, y = cy + world.rng.int(13) - 6;
+  const ax = Math.round(cx + (near.homeX - cx) * G.volcanoReach), ay = Math.round(cy + (near.homeY - cy) * G.volcanoReach);
+  for (let tries = 0; tries < 12; tries++) {
+    // later tries drift back towards the centre, where a mountain is least likely to block a path
+    const back = tries / 12, x = Math.round(ax + (cx - ax) * back) + world.rng.int(5) - 2, y = Math.round(ay + (cy - ay) * back) + world.rng.int(5) - 2;
     const changed: [number, number][] = [];
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
       if (dx * dx + dy * dy > r * r || !inBounds(world, x + dx, y + dy)) continue;
@@ -196,7 +228,10 @@ function volcano(world: World): { x: number; y: number } {
     if (TEAMS.every((t) => seen[idx(world.w, world.teams[t].homeX, world.teams[t].homeY)])) {
       for (const [k] of changed) { world.dirtyTiles.push(k); world.deposits[k] = Deposit.None; }
       for (const u of world.units) if (u.alive && dist(u, { x, y }) <= r) damageUnit(world, u, 999, undefined, 'fell into the volcano');
-      for (const b of world.buildings) if (b.alive && dist(b, { x, y }) <= r + 1) { damageBuilding(world, b, 999); }
+      for (const b of world.buildings) if (b.alive && dist(b, { x, y }) <= r + 1) { damageBuilding(world, b, 999, by); }
+      // lava bombs: the nearest buildings of the other tribes catch fire
+      const bombs = world.buildings.filter((b) => b.alive && b.team !== by && b.type !== 'wall').sort((a, b) => dist(a, { x, y }) - dist(b, { x, y })).slice(0, G.lavaBombs);
+      for (const b of bombs) { damageBuilding(world, b, 30, by); ignite(world, b); }
       for (let dy = -r - 2; dy <= r + 2; dy++) for (let dx = -r - 2; dx <= r + 2; dx++) if (inBounds(world, x + dx, y + dy)) igniteTile(world, idx(world.w, x + dx, y + dy));
       return { x, y };
     }
@@ -226,11 +261,12 @@ export function godTick(world: World): void {
       }
       case 'tornado': case 'titan': {
         e.x += e.dx; e.y += e.dy;
-        if (e.x >= world.w - 1) e.until = world.tick;
+        if (e.x >= world.w - 1 || e.x <= 0) e.until = world.tick;
         const x = Math.round(e.x), y = Math.round(e.y), r = e.kind === 'titan' ? 2 : 1;
         if (world.tick % 5) break;
-        for (const b of world.buildings) if (b.alive && Math.abs(b.x - x) <= r && Math.abs(b.y - y) <= r) damageBuilding(world, b, e.kind === 'titan' ? 999 : G.tornadoDamage / 4);
-        for (const u of world.units) if (u.alive && Math.abs(u.x - x) <= r && Math.abs(u.y - y) <= r) damageUnit(world, u, e.kind === 'titan' ? 999 : 4, undefined, e.kind === 'titan' ? 'was crushed by the titan' : 'was swept up by the tornado');
+        const spared = e.kind === 'titan' ? e.team : undefined;
+        for (const b of world.buildings) if (b.alive && b.team !== spared && Math.abs(b.x - x) <= r && Math.abs(b.y - y) <= r) damageBuilding(world, b, e.kind === 'titan' ? 999 : G.tornadoDamage / 4);
+        for (const u of world.units) if (u.alive && u.team !== spared && Math.abs(u.x - x) <= r && Math.abs(u.y - y) <= r) damageUnit(world, u, e.kind === 'titan' ? 999 : 4, undefined, e.kind === 'titan' ? 'was crushed by the titan' : 'was swept up by the tornado');
         break;
       }
       case 'plague':

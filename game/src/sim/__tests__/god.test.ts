@@ -50,6 +50,20 @@ describe('god effects', () => {
     expect(hpAfter).toBeLessThan(hpBefore);
   });
 
+  it('the big gifts hurt the leading tribe and spare the giver', () => {
+    // against the same world without the gift, since tribes rebuild while the effect plays out
+    const hp = (w: ReturnType<typeof grown>['world'], t: string) => w.buildings.filter((b) => b.alive && b.team === t).reduce((s, b) => s + b.hp, 0);
+    for (const effect of ['volcano', 'flood', 'meteorShower', 'titanWalk'] as const) {
+      const [a, b] = [grown(), grown()];
+      for (const s of [a, b]) s.world.teams.blue.score = 999;
+      applyGod(b.world, effect, 'red', 'Gina');
+      // the titan needs time to walk over; the rest strike at once, before the two worlds drift apart
+      for (let i = 0; i < (effect === 'titanWalk' ? 700 : 60); i++) { a.step(); b.step(); }
+      expect(hp(b.world, 'blue'), `${effect} hits blue`).toBeLessThan(hp(a.world, 'blue'));
+      if (effect !== 'volcano') expect(hp(b.world, 'red'), `${effect} spares red`).toBeGreaterThanOrEqual(hp(a.world, 'red') * 0.9);
+    }
+  });
+
   it('hero fights for the giver and leaves after its time', () => {
     const sim = grown();
     applyGod(sim.world, 'hero', 'red', 'Gina');

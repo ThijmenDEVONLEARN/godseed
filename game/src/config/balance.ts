@@ -45,9 +45,23 @@ export const BALANCE = {
   guardRadius: 5,
   god: {
     heroHp: 300, heroDamage: 15, heroTicks: 1800, weaponBonus: 2, shieldHp: 30, buffTicks: 1200,
-    spawnCount: 6, meteorRadius: 3, meteorDamage: 100, wolfPack: 6, lightningDamage: 60,
+    spawnCount: 6, meteorRadius: 3, meteorDamage: 100, wolfPack: 8, lightningDamage: 60,
     dragonTicks: 1200, dragonFireEvery: 20, tornadoDamage: 80, plagueTicks: 1200, plagueEvery: 10,
     volcanoRadius: 2, goldenAgeTicks: 1800, rainTicks: 300, goldChest: 10, rainOfGold: 20,
+    /** 1-coin gifts also drop this much straight into the stock, so the help is there at once. */
+    spawnStock: 15,
+    /** Wolves from a gift (pack, eclipse) are tougher than forest wolves. */
+    packWolfHp: 45,
+    /** Shield gift: hit points back on every building of the giver's tribe. */
+    shieldRepair: 40,
+    /** Flood: damage to every enemy building near its village, and how far it reaches. */
+    floodDamage: 45, floodRadius: 7,
+    /** How far from the centre towards the strongest enemy the volcano rises (0 = centre, 1 = their village). */
+    volcanoReach: 0.75, lavaBombs: 5,
+    /** Gold rain: what the giver's own tribe gets on top of everyone's gold. */
+    rainOfGoldBonus: 25,
+    /** Rain also waters the fields: food for every tribe. */
+    rainFood: 10,
   },
 
   brain: { everyTicks: 50, raidEveryTicks: 1500, raidChance: 0.3, raidWorkerShare: 0.2, threatMemoryTicks: 200, defendRadius: 6 },
