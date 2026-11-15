@@ -10,6 +10,7 @@ export interface Lens { fovDeg: number; aspect: number }
 
 /** Safe frame in normalised screen coords (-1..1): narrower than the screen, and off-centre for the banner on top. */
 export const SAFE = { x: 0.8, y0: -0.66, y1: 0.52 };
+export type Safe = typeof SAFE;
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -19,7 +20,7 @@ export const mix = (a: Vec3, b: Vec3, k: number): Vec3 => [a[0] + (b[0] - a[0]) 
 export const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** How far the worst subject sticks out: <= 1 fits, 1.2 = 20% outside the safe frame, 9 = behind the camera. */
-export function fit(shot: Shot, subjects: Subject[], lens: Lens): number {
+export function fit(shot: Shot, subjects: Subject[], lens: Lens, safe: Safe = SAFE): number {
   const f = norm(sub(shot.l, shot.p));
   const r = norm(cross(f, [0, 1, 0]));
   const u = cross(r, f);
@@ -30,7 +31,7 @@ export function fit(shot: Shot, subjects: Subject[], lens: Lens): number {
     const dz = dot(v, f);
     if (dz < 1) return 9;
     const nx = dot(v, r) / (dz * tx), ny = dot(v, u) / (dz * ty), mx = s.rx / (dz * tx), my = s.ry / (dz * ty);
-    worst = Math.max(worst, (Math.abs(nx) + mx) / SAFE.x, (ny + my) / SAFE.y1, (my - ny) / -SAFE.y0);
+    worst = Math.max(worst, (Math.abs(nx) + mx) / safe.x, (ny + my) / safe.y1, (my - ny) / -safe.y0);
   }
   return worst;
 }
@@ -42,11 +43,11 @@ export function centre(subjects: Subject[]): Vec3 {
 }
 
 /** Keeps the shot's direction, but aims at the subjects and backs off until they all fit. */
-export function guard(shot: Shot, subjects: Subject[], lens: Lens): Shot {
-  if (!subjects.length || fit(shot, subjects, lens) <= 1) return shot;
+export function guard(shot: Shot, subjects: Subject[], lens: Lens, safe: Safe = SAFE): Shot {
+  if (!subjects.length || fit(shot, subjects, lens, safe) <= 1) return shot;
   const c = centre(subjects);
   let s = shot;
-  for (let i = 0; i < 40 && fit(s, subjects, lens) > 1; i++) {
+  for (let i = 0; i < 40 && fit(s, subjects, lens, safe) > 1; i++) {
     const l = mix(s.l, c, 0.45);
     s = { l, p: [l[0] + (s.p[0] - s.l[0]) * 1.13, l[1] + (s.p[1] - s.l[1]) * 1.13, l[2] + (s.p[2] - s.l[2]) * 1.13] };
   }
@@ -73,8 +74,8 @@ export function clearSight(shot: Shot, top: (x: number, z: number) => number, ma
 }
 
 /** Guard and sight line influence each other, so run them in turns; the guard has the last word. */
-export function frame(shot: Shot, subjects: Subject[], lens: Lens, top: (x: number, z: number) => number): Shot {
-  let s = guard(shot, subjects, lens);
-  s = guard(clearSight(s, top), subjects, lens);
-  return guard(clearSight(s, top), subjects, lens);
+export function frame(shot: Shot, subjects: Subject[], lens: Lens, top: (x: number, z: number) => number, safe: Safe = SAFE): Shot {
+  let s = guard(shot, subjects, lens, safe);
+  s = guard(clearSight(s, top), subjects, lens, safe);
+  return guard(clearSight(s, top), subjects, lens, safe);
 }

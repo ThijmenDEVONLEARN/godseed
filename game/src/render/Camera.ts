@@ -104,5 +104,7 @@ export function createCamera(mapW: number, mapH: number) {
     },
 
     get prio(): string { return Prio[focus.prio]; },
+    /** What the camera is on right now, for the 3D director's framing rule. */
+    get focus(): { x: number; y: number; zoomed: boolean; track?: Track } { return { x: focus.x, y: focus.y, zoomed: focus.prio !== Prio.None, track: focus.track }; },
   };
 }
