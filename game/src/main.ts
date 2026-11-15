@@ -1,48 +1,30 @@
-import { Application, Graphics, TextureStyle } from 'pixi.js';
 import { TEAMS, type RoundEnd } from '@godseed/shared';
 import { BALANCE } from './config/balance';
 import { createCommandRouter } from './commands';
 import { createBridgeClient } from './net/BridgeClient';
-import { createArt, T } from './render/art';
 import { createCamera } from './render/Camera';
 import { PALETTE } from './render/palette';
 import { fitToWindow } from './render/stage';
-import { WorldView } from './render/WorldView';
 import { createSimulation } from './sim/Simulation';
 import type { SimEvent, World } from './sim/types';
 import { createHud } from './ui/Hud';
-import { MAP_TILES, SCREEN, TILE, ZONES } from './ui/layout';
+import { MAP_TILES, ZONES } from './ui/layout';
 import { createDebug } from './ui/debug';
 import { createSpeaker, lineFor } from './voice/speaker';
 
-TextureStyle.defaultOptions.scaleMode = 'nearest';
-
 const stage = document.getElementById('stage')!;
 const ui = document.getElementById('ui')!;
-const app = new Application();
-await app.init({ width: SCREEN.w, height: SCREEN.h, antialias: false, roundPixels: true, backgroundAlpha: 0 });
-stage.prepend(app.canvas);
+const params = new URLSearchParams(location.search);
 fitToWindow(stage);
 await document.fonts.load('700 34px "Pixelify Sans"').catch(() => undefined);
 
-const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed') ?? Math.floor(Math.random() * 1e9));
 const sim = createSimulation(seed);
-const view = new WorldView(createArt(), MAP_TILES.w, MAP_TILES.h);
+// 3D is the game; ?r=pixi shows the old 2D view while the 3D one is being finished
+const view = params.get('r') === 'pixi'
+  ? await (await import('./render/pixiView')).createPixiView(stage)
+  : await (await import('./render3d/view3d')).create3DView(stage, ZONES.map.y, ZONES.bottom.y - 8 - ZONES.map.y);
 const camera = createCamera(MAP_TILES.w, MAP_TILES.h);
-const mapMask = new Graphics().rect(ZONES.map.x, ZONES.map.y, ZONES.map.w, ZONES.map.h).fill('#fff');
-view.root.mask = mapMask;
-app.stage.addChild(view.root, mapMask);
-
-/** Puts the camera's tile (x, y) in the middle of the map zone at the given zoom, never showing past the map edge. */
-function applyCamera(c: { x: number; y: number; zoom: number }): void {
-  const scale = (TILE / T) * c.zoom, tile = TILE * c.zoom;
-  const half = { x: ZONES.map.w / 2 / tile, y: ZONES.map.h / 2 / tile };
-  const cx = Math.min(MAP_TILES.w - half.x, Math.max(half.x, c.x + 0.5)), cy = Math.min(MAP_TILES.h - half.y, Math.max(half.y, c.y + 0.5));
-  view.root.scale.set(scale);
-  view.labelScale = Math.min(1, 1.5 / c.zoom);
-  view.root.position.set(ZONES.map.x + ZONES.map.w / 2 - cx * tile, ZONES.map.y + ZONES.map.h / 2 - cy * tile);
-}
 
 const hud = createHud(ui);
 const debug = createDebug(ui);
@@ -106,18 +88,26 @@ function roundEnd(world: World, winner: RoundEnd['winner']): RoundEnd {
 // ?speed=20 fast-forwards, handy for checking rounds
 const speed = Number(params.get('speed') ?? 1);
 const msPerTick = 1000 / BALANCE.ticksPerSecond / speed;
-let acc = 0;
-app.ticker.add((t) => {
-  acc += Math.min(t.deltaMS, 1000);
+let acc = 0, last = performance.now(), fps = 60;
+function loop(now: number): void {
+  const dtMs = Math.min(now - last, 1000);
+  last = now;
+  fps += (1000 / Math.max(1, dtMs) - fps) * 0.05;
+  acc += dtMs;
   while (acc >= msPerTick) {
     acc -= msPerTick;
     onEvents(sim.world, sim.step());
   }
   view.sync(sim.world, acc / msPerTick);
-  applyCamera(camera.update(sim.world, performance.now(), t.deltaMS, (id) => view.positions.get(id)));
+  view.camera(sim.world, camera.update(sim.world, now, dtMs, (id) => view.positions.get(id)), camera.focus, dtMs);
+  view.render();
   hud.update(sim.world);
-  debug.set(`fps ${app.ticker.FPS.toFixed(0)} · seed ${sim.world.seed} · units ${sim.world.units.filter((u) => u.alive).length} · cam ${camera.prio}`);
-});
+  debug.set(`fps ${fps.toFixed(0)} · seed ${sim.world.seed} · units ${sim.world.units.filter((u) => u.alive).length} · cam ${camera.prio} · ${view.info()}`);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+// for automated checks (Playwright): step the world without waiting for real time
+Object.assign(window, { __gs: { sim, camera, view, route: (e: Parameters<typeof route>[0]) => route(e) } });
 
 // dev keys: R new world, J fake viewer joins, G random gift, S start the Final Storm (the test panel at /panel.html does the rest)
 let fakes = 0;
