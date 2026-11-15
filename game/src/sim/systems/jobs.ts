@@ -76,7 +76,7 @@ export function startGather(world: World, u: Unit, res: Resource): void {
       u.job = { kind: 'gather', res, stage: 'go', tx, ty, workLeft: BALANCE.gather.workTicks.food };
       return;
     }
-    const sheep = nearestSheep(world, u);
+    const sheep = world.tick >= (u.noHuntUntil ?? 0) ? nearestSheep(world, u) : undefined;
     if (sheep) { u.job = { kind: 'hunt', targetId: sheep.id, stage: 'go' }; return; }
     res = 'wood';
   }
@@ -143,6 +143,8 @@ export function jobs(world: World, walls: Map<number, Team>): void {
           } else if (arrived(u) || (world.tick % 20 === u.id % 20)) {
             u.path = undefined;
             goTo(world, u, sheep.y * world.w + sheep.x, walls);
+            // Without this the villager picks the same unreachable sheep again every tick.
+            if (u.job.kind === 'idle') u.noHuntUntil = world.tick + BALANCE.huntRetryTicks;
           }
         } else if (goTo(world, u, homeIdx(world, u.team), walls)) deliver(world, u);
         break;

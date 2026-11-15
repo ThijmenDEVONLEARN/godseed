@@ -57,6 +57,8 @@ export interface Unit extends Mover {
   buff?: { kind: 'weapon' | 'shield'; until: number };
   /** Heroes vanish at this tick. */
   expiresAt?: number;
+  /** No hunting before this tick: the last sheep could not be reached. */
+  noHuntUntil?: number;
 }
 
 export interface Building {

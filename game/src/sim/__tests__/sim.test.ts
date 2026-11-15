@@ -24,6 +24,11 @@ describe('simulation', () => {
     expect(kinds.raid ?? 0).toBeGreaterThan(0);
   });
 
+  it('a villager does not keep chasing a sheep it cannot reach', () => {
+    // Seed 7 has sheep across the water; one retry per tick gave 900+ of these in 1000 ticks.
+    expect(run(7, 1000).kinds.noPath ?? 0).toBeLessThan(30);
+  });
+
   it('is deterministic for the same seed and commands', () => {
     const a = createSimulation(3), b = createSimulation(3);
     for (let i = 0; i < 2000; i++) {

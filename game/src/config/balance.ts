@@ -34,6 +34,7 @@ export const BALANCE = {
 
   moveTicks: { default: 2, forest: 3, hills: 3, road: 1, wallClimb: 20 },
   pathBudgetPerTick: 30,
+  huntRetryTicks: 300, // 30 s of other work after a sheep turned out unreachable
   pathMaxExpansions: 7200, // the whole 80x90 map, so a far target is never 'unreachable' by budget alone
 
   unit: { workerHp: 30, warriorHp: 50, workerDamage: 2, warriorDamage: 5, hitEveryTicks: 10, smithyBonus: 1.5, viewerRespawnTicks: 300 },
