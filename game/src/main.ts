@@ -67,7 +67,8 @@ function onEvents(world: World, events: SimEvent[]): void {
     camera.gift(e.x, e.y, (e.durationTicks ?? 50) * 100, performance.now(), track);
   }
   for (const e of events) {
-    if (e.kind === 'join' && e.unitId !== undefined && e.team) view.point(e.unitId, PALETTE.team[e.team]);
+    if (e.kind === 'join' && e.unitId !== undefined && e.team) { view.point(e.unitId, PALETTE.team[e.team]); view.gesture(e.unitId, 'wave', 40); }
+    if (e.kind === 'built' && e.x !== undefined && e.y !== undefined) for (const u of world.units) if (u.alive && u.team === e.team && Math.abs(u.x - e.x) + Math.abs(u.y - e.y) <= 2) view.gesture(u.id, 'cheer', 20);
     if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y);
     if (e.kind === 'roundEnd' && e.team) bridge.send(roundEnd(world, e.team));
     const line = speaker && lineFor(world, e);

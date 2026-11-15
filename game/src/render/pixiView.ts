@@ -21,6 +21,7 @@ export async function createPixiView(stage: HTMLElement) {
     say: (id: number, text: string, ms?: number) => view.say(id, text, ms),
     bolt: (x: number, y: number) => view.bolt(x, y),
     point: (id: number, color: string) => view.point(id, color),
+    gesture: (() => {}) as (id: number, name: string, ticks?: number) => void, // poses only exist in 3D
     /** Puts the camera's tile (x, y) in the middle of the map zone at the given zoom, never showing past the map edge. */
     camera(_world: World, c: CameraTarget): void {
       const scale = (TILE / T) * c.zoom, tile = TILE * c.zoom;

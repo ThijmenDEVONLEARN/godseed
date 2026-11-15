@@ -2,10 +2,12 @@ import * as THREE from 'three';
 
 import type { CameraTarget, Track } from '../render/Camera';
 import { CAMERA } from '../config/camera';
-import { Deposit, Tile, type ActiveEffect, type Mover, type Unit, type World } from '../sim/types';
+import type { Team } from '@godseed/shared';
+import { Deposit, Tile, type ActiveEffect, type BuildingType, type Mover, type Resource, type Unit, type World } from '../sim/types';
 import { SCREEN } from '../ui/layout';
 import { dist, fit, frame, guard, mix, type Shot, type Subject, type Vec3 } from './frame';
-import { BUILDING_SIZE, TEAM_COLOR, VILLAGER, makeBeast, makeBuilding, mat } from './models';
+import { BUILDING_SIZE, TEAM_COLOR, VILLAGER, makeBeast, makeBuilding, makeRuin, makeScaffold, mat } from './models';
+import { TOOL, pose, poseOf, type PoseName, type Tool } from './poses';
 import { Terrain } from './terrain';
 
 const MAX_UNITS = 420, MAX_ANIMALS = 140, MAX_FIRE = 360, FOV = 46;
@@ -15,6 +17,17 @@ const SKY = { day: 0xa9d6f0, rain: 0x7d8a98, storm: 0x4a3436, eclipse: 0x18213a 
 const unitScale = (u: Unit) => (u.role === 'hero' ? 1.15 : u.role === 'leader' ? 0.85 : 0.62);
 /** The overview may use nearly the whole view; the HUD sits outside the 3D view for now. */
 const WIDE = { x: 0.94, y0: -0.94, y1: 0.94 };
+const LOAD: Record<Resource, number> = { wood: 0x8a5a2b, stone: 0x9aa0aa, food: 0xe2c044, gold: 0xffcf3a, iron: 0x7f8fa6 };
+/** Head of each tool at the end of the handle: size and colour. The sword turns the handle into the blade. */
+const TOOL_HEAD: Record<Tool, { size: [number, number, number]; z: number; color: number }> = {
+  axe: { size: [0.04, 0.22, 0.15], z: 0.4, color: 0xb8bec8 }, pick: { size: [0.05, 0.4, 0.06], z: 0.43, color: 0x5d6470 }, hoe: { size: [0.16, 0.15, 0.04], z: 0.44, color: 0x9aa0aa },
+  hammer: { size: [0.13, 0.15, 0.13], z: 0.42, color: 0x6f6a64 }, sword: { size: [0.22, 0.05, 0.05], z: 0.06, color: 0xffcf3a },
+};
+const DEATH_TICKS = 26, RUIN_TICKS = 600;
+/** Level look of a viewer: 0 Villager, 1 Warrior (headband and feather), 2 Elder (pointed hat), 3 Legend (hat and cape). */
+export interface Cosmetic { tier: 0 | 1 | 2 | 3; top3?: boolean }
+interface Figure { x: number; y: number; z: number; face: number; scale: number; name: PoseName; t: number; seed: number; team: Team; tint: number; skin: number; hair: number; tool?: Tool; load?: number; crown?: boolean; cos?: Cosmetic }
+const UP = new THREE.Vector3(0, 1, 0);
 const hash = (i: number) => (Math.imul(i ^ 0x9e3779b9, 2654435761) >>> 0) / 4294967296;
 
 function instanced(geo: THREE.BufferGeometry, count: number, color = 0xffffff, shadow = true): THREE.InstancedMesh {
@@ -48,6 +61,21 @@ export class WorldView3D {
   private arms = instanced(VILLAGER.arm, MAX_UNITS * 2);
   private legs = instanced(VILLAGER.leg, MAX_UNITS * 2, 0x2b2d38);
   private crowns = instanced(VILLAGER.crown, 8, 0xffcf3a);
+  private cubes = instanced(VILLAGER.cube, MAX_UNITS * 3);
+  private bands = instanced(VILLAGER.band, 64);
+  private feathers = instanced(VILLAGER.feather, 64);
+  private hats = instanced(VILLAGER.hat, 64, 0x5b4636);
+  private capes = instanced(VILLAGER.cape, 64);
+  private stars = instanced(VILLAGER.star, 8, 0xffcf3a);
+  private animalLegs = instanced(VILLAGER.animalLeg, MAX_ANIMALS * 5);
+  private n = { unit: 0, cube: 0, band: 0, feather: 0, hat: 0, cape: 0, star: 0, crown: 0 };
+  private cosmetics = new Map<string, Cosmetic>();
+  private gestures = new Map<number, { name: PoseName; until: number }>();
+  private last = new Map<number, Figure>();
+  private dying: { fig: Figure; at: number }[] = [];
+  private ruins: { g: THREE.Group; at: number }[] = [];
+  private sites = new Map<number, { type: BuildingType; scaffold?: THREE.Group }>();
+  private tick = 0;
   private sheep = instanced(new THREE.BoxGeometry(0.5, 0.36, 0.7).translate(0, 0.32, 0), MAX_ANIMALS);
   private animalHeads = instanced(new THREE.BoxGeometry(0.22, 0.22, 0.26).translate(0, 0.42, 0.42), MAX_ANIMALS);
   private trunks = instanced(new THREE.CylinderGeometry(0.07, 0.1, 0.5, 5).translate(0, 0.25, 0), 1, 0x7a4e2a);
@@ -79,7 +107,7 @@ export class WorldView3D {
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(SCREEN.w, height, false);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const el = this.renderer.domElement;
     el.style.cssText = `position:absolute;left:0;top:${top}px;width:${SCREEN.w}px;height:${height}px`;
     stage.prepend(el);
@@ -97,7 +125,9 @@ export class WorldView3D {
     this.flood.visible = false;
     this.fire.material = new THREE.MeshBasicMaterial();
     this.rain.material = new THREE.MeshBasicMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.6 });
-    this.scene.add(this.sun, this.hemi, water, this.flood, this.body, this.head, this.hair, this.arms, this.legs, this.crowns, this.sheep, this.animalHeads, this.trunks, this.leaves, this.rocks, this.fire, this.rain);
+    for (const m of [this.bands, this.capes]) (m.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    (this.stars.material as THREE.MeshStandardMaterial).emissive.set(0x8a6000);
+    this.scene.add(this.sun, this.hemi, water, this.flood, this.body, this.head, this.hair, this.arms, this.legs, this.crowns, this.cubes, this.bands, this.feathers, this.hats, this.capes, this.stars, this.animalLegs, this.sheep, this.animalHeads, this.trunks, this.leaves, this.rocks, this.fire, this.rain);
   }
 
   get lens() { return { fovDeg: FOV, aspect: this.cam.aspect }; }
@@ -105,6 +135,7 @@ export class WorldView3D {
   /** `alpha` is how far (0..1) real time is between this tick and the next. */
   sync(world: World, alpha: number): void {
     const now = world.tick + alpha;
+    this.tick = now;
     if (world.seed !== this.seed) this.rebuild(world);
     else if (world.dirtyTiles.length) {
       this.terrain!.repaint(world, world.dirtyTiles);
@@ -127,6 +158,12 @@ export class WorldView3D {
     this.scene.add(this.terrain.mesh);
     for (const g of this.buildings.values()) this.scene.remove(g);
     this.buildings.clear();
+    this.sites.clear();
+    for (const r of this.ruins) this.scene.remove(r.g);
+    this.ruins = [];
+    this.dying = [];
+    this.last.clear();
+    this.gestures.clear();
     this.faces.clear();
     this.scatter(world);
     world.dirtyTiles = [];
@@ -191,11 +228,51 @@ export class WorldView3D {
         this.scene.add(g);
       }
       g.scale.y = b.progress >= 1 ? 1 : 0.15 + 0.85 * b.progress; // rises out of the ground while being built
+      const site = this.sites.get(b.id) ?? { type: b.type };
+      this.sites.set(b.id, site);
+      if (b.progress < 1 && !site.scaffold && b.type !== 'farm' && b.type !== 'bridge') {
+        site.scaffold = makeScaffold(b.type);
+        site.scaffold.position.copy(g.position);
+        this.scene.add(site.scaffold);
+      } else if (b.progress >= 1 && site.scaffold) {
+        this.scene.remove(site.scaffold);
+        site.scaffold = undefined;
+      }
+      // damage chars the building, so a village under attack reads at a glance
+      const char = Math.min(0.75, (1 - b.hp / b.maxHp) * 0.9 + (b.burning ? 0.15 : 0));
+      if (char !== g.userData.char) {
+        g.userData.char = char;
+        g.traverse((o) => {
+          const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+          if (!m?.color) return;
+          m.userData.base ??= m.color.getHex();
+          m.color.set(m.userData.base).lerp(this.c.set(0x241f1c), char);
+        });
+      }
     }
-    for (const [id, g] of this.buildings) if (!seen.has(id)) { this.scene.remove(g); this.buildings.delete(id); }
+    for (const [id, g] of this.buildings) {
+      if (seen.has(id)) continue;
+      const site = this.sites.get(id);
+      if (site?.scaffold) this.scene.remove(site.scaffold);
+      if (site && site.type !== 'bridge') {
+        const ruin = makeRuin(site.type, id);
+        ruin.position.copy(g.position);
+        this.scene.add(ruin);
+        this.ruins.push({ g: ruin, at: this.tick });
+      }
+      this.scene.remove(g);
+      this.buildings.delete(id);
+      this.sites.delete(id);
+    }
+    // ruins stay a minute, then sink away
+    this.ruins = this.ruins.filter((r) => {
+      const age = this.tick - r.at;
+      if (age > RUIN_TICKS) { this.scene.remove(r.g); return false; }
+      if (age > RUIN_TICKS - 50) r.g.position.y -= 0.01;
+      return true;
+    });
   }
 
-  /** Smooth position between the previous and the current tile. */
   private place(mv: Mover, now: number): { tx: number; ty: number; moving: boolean } {
     const k = Math.min(1, Math.max(0, (now - mv.moveStartTick) / mv.moveTicks));
     return { tx: mv.px + (mv.x - mv.px) * k, ty: mv.py + (mv.y - mv.py) * k, moving: k < 1 && (mv.px !== mv.x || mv.py !== mv.y) };
@@ -211,58 +288,119 @@ export class WorldView3D {
     return f;
   }
 
-  private syncUnits(world: World, now: number): void {
-    const t = now / 10, up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3(), local = new THREE.Matrix4();
-    let n = 0, crowns = 0;
-    const seen = new Set<number>();
-    const plague = new Set(world.effects.filter((e) => e.kind === 'plague').map((e) => e.team));
-    const limb = (mesh: THREE.InstancedMesh, i: number, x: number, y: number, rx: number, rz = 0) => {
-      local.makeRotationFromEuler(new THREE.Euler(rx, 0, rz)).setPosition(x, y, 0);
-      mesh.setMatrixAt(i, this.m.multiplyMatrices(this.root, local));
+  /** Draws one villager in the next free instance slots; live units, the dying and the catalogue all go through here. */
+  private villager(v: Figure): void {
+    const n = this.n.unit++, ps = pose(v.name, v.t, v.seed), down = v.name === 'die', k = this.figK;
+    const p = this.figP, sc = this.figS.set(v.scale, v.scale, v.scale), local = this.figL, upper = this.figU, part = this.figPart, e = this.figE;
+    this.root.compose(p.set(v.x, v.y + (down ? -ps.y * 0.7 : ps.y) * v.scale, v.z), this.q.setFromAxisAngle(UP, v.face + ps.twist), sc);
+    // a fallen villager turns over the feet; everyone else leans from the hips so the feet stay planted
+    if (down) upper.multiplyMatrices(this.root, local.makeRotationX(ps.lean));
+    else upper.multiplyMatrices(this.root, local.makeRotationX(ps.lean).setPosition(0, 0.55 - 0.55 * Math.cos(ps.lean), -0.55 * Math.sin(ps.lean)));
+    const legs = down ? upper : this.root;
+    const put = (mesh: THREE.InstancedMesh, i: number, base: THREE.Matrix4, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) => {
+      local.compose(p.set(x, y, z), this.q.setFromEuler(e.set(rx, ry, rz)), k.set(sx, sy, sz));
+      mesh.setMatrixAt(i, this.m.multiplyMatrices(base, local));
     };
-    for (const u of world.units) {
-      if (!u.alive || n >= MAX_UNITS) continue;
-      seen.add(u.id);
-      const pl = this.place(u, now), [x, y, z] = this.at(pl.tx, pl.ty), f = this.face(u, pl.moving);
-      this.positions.set(u.id, { x: pl.tx, y: pl.ty });
-      const scale = unitScale(u);
-      const ph = now * 0.9 + u.id, walk = pl.moving ? 1 : 0, sw = Math.sin(ph) * 0.8 * walk;
-      const working = !pl.moving && (u.job.kind === 'gather' && u.job.stage === 'work' || u.job.kind === 'build'), fighting = !pl.moving && u.job.kind === 'attack', praying = u.job.kind === 'pray' && !pl.moving;
-      const bob = Math.abs(Math.sin(ph)) * 0.07 * walk + (praying ? -0.22 : 0);
-      this.root.compose(p.set(x, y + bob * scale, z), this.q.setFromAxisAngle(up, f), s.set(scale, scale, scale));
-      this.unitY.set(u.id, y);
-      // anticipation and a fast strike: slow up, quick down
-      const beat = (now * (fighting ? 0.5 : 0.33) + u.id * 0.37) % 1, strike = beat < 0.7 ? -2.4 * (beat / 0.7) : -2.4 * (1 - (beat - 0.7) / 0.3);
-      const armR = working || fighting ? strike : praying ? -2.8 + Math.sin(t * 2) * 0.15 : sw * 0.85, armL = praying ? -2.8 - Math.sin(t * 2) * 0.15 : -sw * 0.85;
-      const tint = plague.has(u.team) ? 0x8fcf6a : u.role === 'hero' ? 0xc3cad6 : TEAM_COLOR[u.team];
-      this.body.setMatrixAt(n, this.m.multiplyMatrices(this.root, local.makeTranslation(0, 0.55, 0)));
-      this.body.setColorAt(n, this.c.set(tint));
-      local.makeRotationY(pl.moving ? 0 : Math.sin(t * 0.6 + u.id) * 0.45).setPosition(0, 1.39, 0);
-      this.head.setMatrixAt(n, this.m.multiplyMatrices(this.root, local));
-      this.head.setColorAt(n, this.c.set(plague.has(u.team) ? 0xbfe0a0 : 0xf2c49b));
-      local.setPosition(0, 1.42, -0.02);
-      this.hair.setMatrixAt(n, this.m.multiplyMatrices(this.root, local));
-      this.hair.setColorAt(n, this.c.set(u.role === 'hero' ? 0xc3cad6 : HAIR[u.id % HAIR.length]));
-      limb(this.arms, n * 2, -0.31, 1.11, armL, -0.06);
-      limb(this.arms, n * 2 + 1, 0.31, 1.11, armR, 0.06);
-      this.arms.setColorAt(n * 2, this.c.set(tint));
-      this.arms.setColorAt(n * 2 + 1, this.c);
-      limb(this.legs, n * 2, -0.11, 0.55, sw);
-      limb(this.legs, n * 2 + 1, 0.11, 0.55, -sw);
-      if (u.role === 'leader' && crowns < 8) {
-        local.makeTranslation(0, 1.7, 0);
-        this.crowns.setMatrixAt(crowns++, this.m.multiplyMatrices(this.root, local));
-      }
-      if (u.name) this.label(u, x, y + scale * 1.75 + 0.35, z);
-      n++;
+    put(this.body, n, upper, 0, 0.55, 0);
+    this.body.setColorAt(n, this.c.set(v.tint));
+    put(this.head, n, upper, 0, 1.39, 0, ps.headX, ps.headY);
+    const head = part.copy(this.m);
+    this.head.setColorAt(n, this.c.set(v.skin));
+    put(this.hair, n, upper, 0, 1.42, -0.02, ps.headX, ps.headY);
+    this.hair.setColorAt(n, this.c.set(v.hair));
+    put(this.arms, n * 2, upper, -0.31, 1.11, 0, ps.armL, 0, ps.armLz);
+    this.arms.setColorAt(n * 2, this.c.set(v.tint));
+    put(this.arms, n * 2 + 1, upper, 0.31, 1.11, 0, ps.armR, 0, ps.armRz);
+    const hand = this.figHand.copy(this.m);
+    this.arms.setColorAt(n * 2 + 1, this.c);
+    put(this.legs, n * 2, legs, -0.11, 0.55, 0, ps.legL);
+    put(this.legs, n * 2 + 1, legs, 0.11, 0.55, 0, ps.legR);
+    const cube = (base: THREE.Matrix4, x: number, y: number, z: number, sx: number, sy: number, sz: number, color: number) => {
+      if (this.n.cube >= this.cubes.instanceMatrix.count) return;
+      put(this.cubes, this.n.cube, base, x, y, z, 0, 0, 0, sx, sy, sz);
+      this.cubes.setColorAt(this.n.cube++, this.c.set(color));
+    };
+    if (v.tool) {
+      const h = TOOL_HEAD[v.tool], sword = v.tool === 'sword';
+      cube(hand, 0, -0.44, sword ? 0.4 : 0.2, 0.05, sword ? 0.03 : 0.05, sword ? 0.74 : 0.5, sword ? 0xdfe6ee : 0x8a5a2b);
+      cube(hand, 0, -0.44, h.z, ...h.size, h.color);
     }
-    for (const mesh of [this.body, this.head, this.hair]) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
-    for (const mesh of [this.arms, this.legs]) { mesh.count = n * 2; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
-    this.crowns.count = crowns;
-    this.crowns.instanceMatrix.needsUpdate = true;
+    if (v.load !== undefined) cube(upper, 0, 0.98, 0.36, 0.26, 0.22, 0.26, v.load);
+    if (v.crown && this.n.crown < 8) put(this.crowns, this.n.crown++, head, 0, 0.31, 0);
+    const cos = v.cos;
+    if (cos?.tier === 1 && this.n.band < 64) {
+      put(this.feathers, this.n.feather++, head, 0, 0, 0);
+      put(this.bands, this.n.band, head, 0, 0.08, 0);
+      this.bands.setColorAt(this.n.band++, this.c.set(TEAM_COLOR[v.team]));
+    }
+    if (cos && cos.tier >= 2 && this.n.hat < 64 && this.n.band < 64) {
+      put(this.hats, this.n.hat++, head, 0, 0, 0);
+      put(this.bands, this.n.band, head, 0, 0.26, 0, 0, 0, 0, 0.84);
+      this.bands.setColorAt(this.n.band++, this.c.set(TEAM_COLOR[v.team]));
+    }
+    if (cos?.tier === 3 && this.n.cape < 64) {
+      const moving = v.name === 'walk' || v.name === 'carry';
+      put(this.capes, this.n.cape, upper, 0, 1.15, -0.27, -(0.12 + (moving ? 0.45 : 0) + Math.sin(v.t * 5 + v.seed) * 0.08));
+      this.capes.setColorAt(this.n.cape++, this.c.set(TEAM_COLOR[v.team]).multiplyScalar(0.7));
+    }
+    if (cos?.top3 && this.n.star < 8) put(this.stars, this.n.star++, this.root, 0, 2.95 + Math.sin(v.t * 3) * 0.06, 0, 0, v.t * 2.2);
+  }
+
+  private figP = new THREE.Vector3();
+  private figS = new THREE.Vector3();
+  private figK = new THREE.Vector3();
+  private figE = new THREE.Euler();
+  private figL = new THREE.Matrix4();
+  private figU = new THREE.Matrix4();
+  private figPart = new THREE.Matrix4();
+  private figHand = new THREE.Matrix4();
+
+  private syncUnits(world: World, now: number): void {
+    const t = now / 10, seen = new Set<number>();
+    const plague = new Set(world.effects.filter((e) => e.kind === 'plague').map((e) => e.team));
+    this.n = { unit: 0, cube: 0, band: 0, feather: 0, hat: 0, cape: 0, star: 0, crown: 0 };
+    for (const u of world.units) {
+      if (!u.alive || this.n.unit >= MAX_UNITS) continue;
+      seen.add(u.id);
+      const pl = this.place(u, now), [x, y, z] = this.at(pl.tx, pl.ty), sick = plague.has(u.team), scale = unitScale(u);
+      this.positions.set(u.id, { x: pl.tx, y: pl.ty });
+      this.unitY.set(u.id, y);
+      const g = this.gestures.get(u.id);
+      if (g && now > g.until) this.gestures.delete(u.id);
+      const name = g && now <= g.until && !pl.moving ? g.name : poseOf(u, pl.moving, sick);
+      const fig: Figure = {
+        x, y, z, face: this.face(u, pl.moving), scale, name, t, seed: u.id, team: u.team,
+        tint: sick ? 0x8fcf6a : u.role === 'hero' ? 0xc3cad6 : TEAM_COLOR[u.team], skin: sick ? 0xbfe0a0 : 0xf2c49b, hair: u.role === 'hero' ? 0xc3cad6 : HAIR[u.id % HAIR.length],
+        tool: TOOL[name] ?? (u.role === 'hero' || u.role === 'warrior' ? 'sword' : undefined),
+        load: u.carrying && name !== 'fight' ? LOAD[u.carrying.res] : undefined,
+        crown: u.role === 'leader', cos: u.viewerId ? this.cosmetics.get(u.viewerId) : undefined,
+      };
+      this.villager(fig);
+      this.last.set(u.id, fig);
+      if (u.name) this.label(u, x, y + scale * 1.75 + 0.35, z);
+    }
+    // a unit that was here last frame and is gone now falls over where it stood
+    for (const [id, fig] of this.last) if (!seen.has(id)) { this.dying.push({ fig, at: now }); this.last.delete(id); }
+    this.dying = this.dying.filter((d) => now - d.at < DEATH_TICKS && now >= d.at);
+    for (const d of this.dying) {
+      if (this.n.unit >= MAX_UNITS) break;
+      const age = now - d.at;
+      this.villager({ ...d.fig, name: 'die', t: age / 10, tool: undefined, load: undefined, y: d.fig.y - Math.max(0, age - (DEATH_TICKS - 8)) * 0.06 });
+    }
+    const n = this.n;
+    const flush = (mesh: THREE.InstancedMesh, count: number) => { mesh.count = count; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; };
+    for (const mesh of [this.body, this.head, this.hair]) flush(mesh, n.unit);
+    for (const mesh of [this.arms, this.legs]) flush(mesh, n.unit * 2);
+    flush(this.cubes, n.cube); flush(this.bands, n.band); flush(this.feathers, n.feather); flush(this.hats, n.hat); flush(this.capes, n.cape); flush(this.stars, n.star); flush(this.crowns, n.crown);
     for (const [id, l] of this.labels) if (!seen.has(id)) { this.scene.remove(l.sprite); l.sprite.material.map?.dispose(); this.labels.delete(id); }
     for (const id of this.positions.keys()) if (!seen.has(id)) { this.positions.delete(id); this.faces.delete(id); this.unitY.delete(id); }
   }
+
+  /** Plays a pose on a standing unit for a while: a wave on joining, a cheer on a win. */
+  gesture(id: number, name: PoseName, ticks = 30): void { this.gestures.set(id, { name, until: this.tick + ticks }); }
+
+  /** Level look per viewer; fed from the player profiles. */
+  setCosmetic(viewerId: string, cos: Cosmetic): void { this.cosmetics.set(viewerId, cos); }
 
   private label(u: Unit, x: number, y: number, z: number): void {
     let l = this.labels.get(u.id);
@@ -289,18 +427,29 @@ export class WorldView3D {
   }
 
   private syncAnimals(world: World, now: number): void {
-    const up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3();
-    let n = 0;
+    const up = UP, p = new THREE.Vector3(), s = new THREE.Vector3();
+    let n = 0, legs = 0;
     for (const a of world.animals) {
       if (!a.alive || n >= MAX_ANIMALS) continue;
-      const pl = this.place(a, now), [x, y, z] = this.at(pl.tx, pl.ty), wolf = a.kind === 'wolf', k = wolf ? 1.15 : 1;
+      const pl = this.place(a, now), [x, y, z] = this.at(pl.tx, pl.ty), wolf = a.kind === 'wolf', k = wolf ? 0.72 : 0.62; // same scale as the villagers next to them
       this.m.compose(p.set(x, y + (pl.moving ? Math.abs(Math.sin(now * 0.9 + a.id)) * 0.08 : 0), z), this.q.setFromAxisAngle(up, this.face(a, pl.moving)), s.set(k * (wolf ? 0.8 : 1), k, k * (wolf ? 1.25 : 1)));
       this.sheep.setMatrixAt(n, this.m);
       this.sheep.setColorAt(n, this.c.set(wolf ? 0x6b7078 : 0xf4f1e8));
       this.animalHeads.setMatrixAt(n, this.m);
       this.animalHeads.setColorAt(n, this.c.set(wolf ? 0x4f545c : 0x2b2d38));
+      // four legs trot in diagonal pairs; a wolf's fifth 'leg' is its tail
+      const body = this.root.copy(this.m), swing = pl.moving ? Math.sin(now * 0.9 + a.id) * 0.7 : 0, local = this.figL, e = this.figE;
+      for (let i = 0; i < (wolf ? 5 : 4) && legs < this.animalLegs.instanceMatrix.count; i++) {
+        if (i < 4) local.makeRotationX(i % 3 === 0 ? swing : -swing).setPosition(i % 2 ? 0.17 : -0.17, 0.28, i < 2 ? 0.24 : -0.24);
+        else local.makeRotationFromEuler(e.set(-1.9 + Math.sin(now * 0.6 + a.id) * 0.25, 0, 0)).setPosition(0, 0.46, -0.36);
+        this.animalLegs.setMatrixAt(legs, this.m.multiplyMatrices(body, local));
+        this.animalLegs.setColorAt(legs++, this.c.set(wolf ? 0x4f545c : 0x2b2d38));
+      }
       n++;
     }
+    this.animalLegs.count = legs;
+    this.animalLegs.instanceMatrix.needsUpdate = true;
+    if (this.animalLegs.instanceColor) this.animalLegs.instanceColor.needsUpdate = true;
     for (const mesh of [this.sheep, this.animalHeads]) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
   }
 
@@ -468,6 +617,18 @@ export class WorldView3D {
     this.cam.position.set(...this.camP);
     this.cam.lookAt(...this.camL);
   }
+
+  /** Fixed camera in tile coordinates, for the catalogue; the game uses `camera()` with the framing rule. */
+  lookFrom(from: { x: number; y: number; up: number }, at: { x: number; y: number }): void {
+    const [x, y, z] = this.at(at.x, at.y), [px, , pz] = this.at(from.x, from.y);
+    this.camP = [px, y + from.up, pz];
+    this.camL = [x, y + 0.6, z];
+    this.cam.position.set(...this.camP);
+    this.cam.lookAt(...this.camL);
+  }
+
+  /** Turns a standing unit; walking units face where they go. */
+  turn(id: number, angle: number): void { this.faces.set(id, angle); }
 
   render(): void { this.renderer.render(this.scene, this.cam); }
 }
