@@ -48,6 +48,7 @@ const route = createCommandRouter(sim, {
   },
   vote: (viewerId, option) => sim.enqueue({ kind: 'vote', viewerId, option }),
   likes: (total) => hud.likes(total),
+  focus: (unitId, viewerId) => camera.command(unitId, viewerId, performance.now()),
 });
 bridge.onEvent((e) => {
   if (e.type === 'status') {
@@ -62,9 +63,9 @@ function onEvents(world: World, events: SimEvent[]): void {
   hud.events(world, events);
   camera.events(events, performance.now());
   for (const e of events) {
-    if ((e.kind !== 'god' && e.kind !== 'leader') || e.x === undefined || e.y === undefined) continue;
+    if (e.kind !== 'god' || e.x === undefined || e.y === undefined) continue;
     const track = e.effect ? { effect: e.effect } : e.unitId !== undefined ? { unitId: e.unitId } : undefined;
-    camera.gift(e.x, e.y, (e.durationTicks ?? 50) * 100, performance.now(), track);
+    camera.gift(e.x, e.y, (e.durationTicks ?? 50) * 100, performance.now(), track, { by: e.viewerId, coins: e.coins });
   }
   for (const e of events) {
     if (e.kind === 'join' && e.unitId !== undefined && e.team) { view.point(e.unitId, PALETTE.team[e.team]); view.gesture(e.unitId, 'wave', 40); }

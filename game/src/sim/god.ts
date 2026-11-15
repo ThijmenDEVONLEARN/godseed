@@ -39,7 +39,7 @@ export function applyGift(world: World, viewerId: string, name: string, coins: n
   const effect = giftEffect(world, coins, giftId);
   if (effect === 'leader') return makeLeader(world, viewerId, name);
   const unit = viewerUnitOf(world, viewerId);
-  applyGod(world, effect, unit?.team ?? smallestTeam(world), name, unit);
+  applyGod(world, effect, unit?.team ?? smallestTeam(world), name, unit, { viewerId, coins });
 }
 
 function makeLeader(world: World, viewerId: string, name: string): void {
@@ -57,7 +57,7 @@ function makeLeader(world: World, viewerId: string, name: string): void {
   u.role = 'leader';
   u.maxHp = BALANCE.unit.warriorHp + 50;
   u.hp = u.maxHp;
-  emit(world, { kind: 'leader', team: u.team, unitId: u.id, x: u.x, y: u.y, durationTicks: 30, text: `${u.name} is the new CHIEF of ${cap(u.team)}!` });
+  emit(world, { kind: 'leader', team: u.team, unitId: u.id, viewerId, x: u.x, y: u.y, durationTicks: 30, text: `${u.name} is the new CHIEF of ${cap(u.team)}!` });
 }
 
 function landNear(world: World, cx: number, cy: number, r: number, ok = (t: number) => isLand(t) && t !== Tile.Mountain): [number, number] | undefined {
@@ -71,7 +71,7 @@ function landNear(world: World, cx: number, cy: number, r: number, ok = (t: numb
 const freeTile = (t: number) => t === Tile.Grass || t === Tile.Burnt;
 
 /** Runs one god effect for `team` (the giver's tribe); harmful ones hit the strongest other tribe. */
-export function applyGod(world: World, effect: GodEffect, team: Team, byName = 'The gods', unit?: Unit): void {
+export function applyGod(world: World, effect: GodEffect, team: Team, byName = 'The gods', unit?: Unit, gift: { viewerId?: string; coins?: number } = {}): void {
   const enemy = enemyOf(world, team);
   const home = world.teams[team], eh = world.teams[enemy];
   const cx = world.w >> 1, cy = world.h >> 1;
@@ -146,7 +146,7 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
       target = enemy;
       const h = spawnUnit(world, team, 'hero', home.homeX, home.homeY, { name: `${byName.slice(0, 12)} the Hero`, expiresAt: world.tick + G.heroTicks });
       at = h; ticks = 60;
-      emit(world, { kind: 'god', team, unitId: h.id, x: h.x, y: h.y, durationTicks: ticks, text: `${byName} ${EFFECT_TEXT.hero} ${cap(enemy)}!` });
+      emit(world, { kind: 'god', team, unitId: h.id, x: h.x, y: h.y, durationTicks: ticks, ...gift, text: `${byName} ${EFFECT_TEXT.hero} ${cap(enemy)}!` });
       return;
     }
     case 'dragon': case 'tornado': case 'plague': case 'goldenAge': case 'titanWalk': {
@@ -192,7 +192,7 @@ export function applyGod(world: World, effect: GodEffect, team: Team, byName = '
   }
   const global = effect === 'eclipse' || effect === 'meteorShower' || effect === 'rainOfGold' || effect === 'titanWalk' || effect === 'rain';
   const text = global ? `${byName} ${EFFECT_TEXT[effect]}!` : `${byName} ${EFFECT_TEXT[effect]} ${cap(target)}!`;
-  emit(world, { kind: 'god', team: target, x: Math.round(at.x), y: Math.round(at.y), durationTicks: ticks, unitId: unit && (effect === 'weapon' || effect === 'shield') ? unit.id : undefined, effect: moving, text });
+  emit(world, { kind: 'god', team: target, x: Math.round(at.x), y: Math.round(at.y), durationTicks: ticks, unitId: unit && (effect === 'weapon' || effect === 'shield') ? unit.id : undefined, effect: moving, ...gift, text });
 }
 
 function meteor(world: World, x: number, y: number, by?: Team): { x: number; y: number } {

@@ -114,6 +114,10 @@ export interface SimEvent {
   durationTicks?: number;
   /** For 'god' events with a moving effect, so the camera can follow it. */
   effect?: ActiveEffect['kind'];
+  /** The viewer behind it (join, gift, new chief). */
+  viewerId?: string;
+  /** For 'god' events from a gift: what it was worth. */
+  coins?: number;
 }
 
 export interface RoundState {

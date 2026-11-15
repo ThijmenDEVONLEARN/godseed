@@ -14,6 +14,8 @@ export interface CommandSinks {
   vote(viewerId: string, option: 1 | 2 | 3): void;
   /** Like total, for the rain progress bar. */
   likes(total: number): void;
+  /** A viewer's command went through: put their villager on screen for a moment. */
+  focus?(unitId: number, viewerId: string): void;
 }
 
 /** Turns viewer events into sim commands and on-screen feedback. Gifts, likes, follows and shares get effects in phase 3. */
@@ -40,7 +42,7 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
             return;
           }
           warned.delete(e.viewer.id);
-          if (unit?.alive) out.say(unit.id, e.text.trim().slice(0, 30));
+          if (unit?.alive) { out.say(unit.id, e.text.trim().slice(0, 30)); out.focus?.(unit.id, e.viewer.id); }
         }
         sim.enqueue(parsed.sim);
         return;
