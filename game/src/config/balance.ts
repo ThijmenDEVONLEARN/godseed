@@ -3,7 +3,7 @@ import type { BuildingType, Resource } from '../sim/types';
 /** Every gameplay number lives here. Ticks are 1/10 s. */
 export const BALANCE = {
   ticksPerSecond: 10,
-  map: { w: 64, h: 72 },
+  map: { w: 80, h: 90 },
   startStock: { wood: 30, stone: 10, food: 40, gold: 0, iron: 0 } as Record<Resource, number>,
   startNpcs: 8,
   npcMin: 8,
@@ -34,7 +34,7 @@ export const BALANCE = {
 
   moveTicks: { default: 2, forest: 3, hills: 3, road: 1, wallClimb: 20 },
   pathBudgetPerTick: 30,
-  pathMaxExpansions: 2000,
+  pathMaxExpansions: 7200, // the whole 80x90 map, so a far target is never 'unreachable' by budget alone
 
   unit: { workerHp: 30, warriorHp: 50, workerDamage: 2, warriorDamage: 5, hitEveryTicks: 10, smithyBonus: 1.5, viewerRespawnTicks: 300 },
   tower: { range: 6, damage: 3, everyTicks: 10 },
