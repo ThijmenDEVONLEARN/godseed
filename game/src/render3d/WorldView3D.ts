@@ -4,8 +4,9 @@ import type { CameraTarget, Track } from '../render/Camera';
 import { CAMERA } from '../config/camera';
 import type { Team } from '@godseed/shared';
 import { Deposit, Tile, type ActiveEffect, type BuildingType, type Mover, type Resource, type Unit, type World } from '../sim/types';
+import { isLand } from '../sim/grid';
 import { SCREEN } from '../ui/layout';
-import { dist, fit, frame, guard, mix, type Shot, type Subject, type Vec3 } from './frame';
+import { centre, dist, fit, frame, guard, mix, type Shot, type Subject, type Vec3 } from './frame';
 import { BUILDING_SIZE, TEAM_COLOR, VILLAGER, makeBeast, makeBuilding, makeRuin, makeScaffold, mat } from './models';
 import { TOOL, pose, poseOf, type PoseName, type Tool } from './poses';
 import { Terrain } from './terrain';
@@ -53,6 +54,8 @@ export class WorldView3D {
   private hemi = new THREE.HemisphereLight(0xdcefff, 0x56663a, 1.1);
   private terrain?: Terrain;
   private seed = NaN;
+  /** The coast, two points per map row, so the overview frames the land and not the sea around it. */
+  private coast: Subject[] = [];
   private w = 0;
   private h = 0;
   private body = instanced(VILLAGER.body, MAX_UNITS);
@@ -153,6 +156,12 @@ export class WorldView3D {
   private rebuild(world: World): void {
     this.seed = world.seed;
     this.w = world.w; this.h = world.h;
+    this.coast = [];
+    for (let y = 0; y < world.h; y++) {
+      let x0 = -1, x1 = -1;
+      for (let x = 0; x < world.w; x++) if (isLand(world.tiles[y * world.w + x])) { if (x0 < 0) x0 = x; x1 = x; }
+      if (x0 >= 0) for (const x of [x0, x1 + 1]) this.coast.push({ x: x - world.w / 2, y: 0, z: y + 0.5 - world.h / 2, rx: 0, ry: 0 });
+    }
     if (this.terrain) { this.scene.remove(this.terrain.mesh); this.terrain.mesh.geometry.dispose(); }
     this.terrain = new Terrain(world);
     this.scene.add(this.terrain.mesh);
@@ -587,9 +596,15 @@ export class WorldView3D {
   camera(world: World, c: CameraTarget, focus: { x: number; y: number; zoomed: boolean; track?: Track }, dtMs: number): void {
     if (!this.terrain) return;
     const t = performance.now() / 1000, dt = Math.min(0.1, dtMs / 1000), k = Math.min(1, Math.max(0, (c.zoom - 1) / 1.1));
-    // overview: the whole island, as large as the view allows
-    const ex = this.w * 0.46, ez = this.h * 0.46, corners: Subject[] = [[-ex, -ez], [ex, -ez], [-ex, ez], [ex, ez]].map(([cx, cz]) => ({ x: cx, y: 0, z: cz, rx: 0, ry: 0 }));
-    const over = guard({ p: [Math.sin(t * 0.045) * 12, 70, 52], l: [0, 0, 0] }, corners, this.lens, WIDE);
+    // overview: the island just fills the view. The guard only backs off, so start too close and let it stop at the first fit.
+    const mid = centre(this.coast);
+    let over = guard({ p: [mid[0] + Math.sin(t * 0.045) * 2, 12, mid[2] + 9], l: [mid[0], 0, mid[2]] }, this.coast, this.lens, WIDE);
+    // the guard backs off in coarse steps; creep back in until the coast touches the edge
+    for (let i = 0; i < 12; i++) {
+      const nearer: Shot = { l: over.l, p: mix(over.p, over.l, 0.015) };
+      if (fit(nearer, this.coast, this.lens, WIDE) > 1) break;
+      over = nearer;
+    }
     const [x, y, z] = this.at(c.x, c.y), d = 24 / c.zoom, az = Math.sin(t * 0.12) * 0.5, el = 0.56;
     const close: Shot = { l: [x, y + 1, z], p: [x + Math.sin(az) * Math.cos(el) * d, y + 1 + Math.sin(el) * d, z + Math.cos(az) * Math.cos(el) * d] };
     const ease = k * k * (3 - 2 * k);
