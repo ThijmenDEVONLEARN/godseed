@@ -4,7 +4,7 @@ import { BALANCE } from '../../config/balance';
 import { hashValue } from '../hash';
 import { createSimulation } from '../Simulation';
 import { walkableTile } from '../grid';
-import { newRound } from '../systems/round';
+import { newRound, viewerScore } from '../systems/round';
 
 const run = (seed: number, ticks: number) => {
   const sim = createSimulation(seed);
@@ -82,6 +82,18 @@ describe('viewer units', () => {
     const u = sim.world.units.find((x) => x.viewerId === 'w')!;
     expect(u.job.kind).not.toBe('idle');
     expect(u.x !== sim.world.teams.green.homeX || u.y !== sim.world.teams.green.homeY).toBe(true);
+  });
+
+  it('earn work points, twice as fast when they ordered the work', () => {
+    const sim = createSimulation(5);
+    for (const id of ['lazy', 'busy']) sim.enqueue({ kind: 'join', viewerId: id, name: id, team: 'green' });
+    sim.step();
+    sim.enqueue({ kind: 'order', viewerId: 'busy', order: 'farm' });
+    for (let i = 0; i < 3000; i++) sim.step();
+    const [lazy, busy] = ['lazy', 'busy'].map((id) => sim.world.units.find((u) => u.viewerId === id)!);
+    expect(busy.work).toBeGreaterThanOrEqual(100);
+    expect(busy.work).toBeGreaterThan(lazy.work);
+    expect(viewerScore(busy)).toBe(3 * busy.kills + Math.floor(busy.work / 100) + (busy.alive ? 2 : 0));
   });
 
   it('puts up a statue of the best viewer in the next world, on tiles nobody can walk', () => {

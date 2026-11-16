@@ -102,16 +102,13 @@ function onEvents(world: World, events: SimEvent[]): void {
     const track = e.effect ? { effect: e.effect } : e.unitId !== undefined ? { unitId: e.unitId } : undefined;
     camera.gift(e.x, e.y, (e.durationTicks ?? 50) * 100, performance.now(), track, { by: e.viewerId, coins: e.coins });
   }
+  // kills and work can push a viewer over a level line mid-round; checked once a second
+  if (world.tick % BALANCE.ticksPerSecond === 0) for (const u of world.units) if (u.viewerId && u.alive && players.provisional(u.viewerId, viewerScore(u), commanded.has(u.viewerId))) levelUp(u.viewerId);
   for (const e of events) {
     if (e.kind === 'join' && e.unitId !== undefined && e.team) {
       view.point(e.unitId, PALETTE.team[e.team]);
       view.gesture(e.unitId, 'wave', 40);
       if (e.viewerId) { dress(e.viewerId); if (players.get(e.viewerId)) welcome(e.viewerId); else welcomeLater.add(e.viewerId); }
-    }
-    // a kill can push a viewer over a level line mid-round
-    if (e.kind === 'kill' && e.unitId !== undefined) {
-      const u = world.units.find((x) => x.id === e.unitId);
-      if (u?.viewerId && players.provisional(u.viewerId, viewerScore(u), commanded.has(u.viewerId))) levelUp(u.viewerId);
     }
     if (e.kind === 'newRound') { commanded.clear(); if (world.statue) dress(world.statue.viewerId); }
     if (e.kind === 'built' && e.x !== undefined && e.y !== undefined) for (const u of world.units) if (u.alive && u.team === e.team && Math.abs(u.x - e.x) + Math.abs(u.y - e.y) <= 2) view.gesture(u.id, 'cheer', 20);

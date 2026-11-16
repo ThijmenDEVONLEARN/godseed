@@ -3,7 +3,7 @@ import type { Team } from './events';
 /** Everything the game keeps about a viewer. No other personal data. */
 export interface Profile { id: string; name: string; xp: number; level: number; rounds: number; wins: number; kills: number; lastTeam?: Team; firstSeen: number; lastSeen: number }
 
-/** One viewer at the end of a round: their score (3 per kill, 2 if alive) and whether they gave a command after !join. */
+/** One viewer at the end of a round: their score (3 per kill, 1 per 5 loads, 2 per building, 2 if alive) and whether they gave a command after !join. */
 export interface RoundPlayer { id: string; name: string; team: Team; score: number; kills: number; commanded: boolean }
 
 export const XP = { perRoundMax: 100, commanded: 5, win: 10 } as const;

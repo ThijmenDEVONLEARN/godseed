@@ -17,7 +17,7 @@ export type Order = 'chop' | 'mine' | 'farm' | 'defend' | 'march' | 'pray';
 export type Job =
   | { kind: 'idle' }
   | { kind: 'gather'; res: Resource; stage: 'go' | 'work' | 'return'; tx: number; ty: number; workLeft: number }
-  | { kind: 'build'; targetId: number }
+  | { kind: 'build'; targetId: number; /** a viewer's own !build */ ordered?: boolean }
   | { kind: 'attack'; team: Team; targetId: number; targetIsUnit: boolean; burn?: boolean }
   | { kind: 'guard'; x: number; y: number }
   | { kind: 'pray'; workLeft: number }
@@ -53,6 +53,8 @@ export interface Unit extends Mover {
   job: Job;
   nextHitTick: number;
   kills: number;
+  /** Work in hundredths of a point (whole numbers, so no float drift): 1 point per 5 loads brought home, 2 per whole building's worth of building; half without a viewer's order. */
+  work: number;
   respawnAt?: number;
   /** Gift buff on a viewer unit. */
   buff?: { kind: 'weapon' | 'shield'; until: number };

@@ -18,7 +18,8 @@ export const STORM = 'The storm';
 export const survived = (world: World, team: Team) => buildingsOf(world, team).some((b) => b.progress >= 1);
 
 /** A viewer's score for the round: 3 per kill, 2 if still alive (XP and the MVP use it). */
-export const viewerScore = (u: Unit) => 3 * u.kills + (u.alive ? 2 : 0);
+/** 3 per kill, 1 per 5 loads brought home, 2 per building built, 2 if alive at the end. */
+export const viewerScore = (u: Unit) => 3 * u.kills + Math.floor(u.work / 100) + (u.alive ? 2 : 0);
 
 export function scoreOf(world: World, team: Team): number {
   const t = world.teams[team];

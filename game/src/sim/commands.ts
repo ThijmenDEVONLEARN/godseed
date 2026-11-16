@@ -49,7 +49,7 @@ export function applyCommand(world: World, cmd: SimCommand): void {
       }
       const placed = placeBuilding(world, u.team, cmd.building);
       if (!placed.length) { info(world, `${u.name}: no room for a ${cmd.building}`, u.team); return; }
-      u.job = { kind: 'build', targetId: placed[0].id };
+      u.job = { kind: 'build', targetId: placed[0].id, ordered: true };
       u.path = undefined;
       return;
     }
