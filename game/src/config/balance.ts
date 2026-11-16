@@ -69,8 +69,8 @@ export const BALANCE = {
   animals: { sheepStart: 14, sheepFood: 5, wolfEveryTicks: 1000, wolfMax: 6, wolfHp: 20, wolfDamage: 3, wolfAggroRange: 5, sheepHp: 6 },
 
   round: {
-    roundTicks: 72_000,
-    stormTicks: 6_000,
+    roundTicks: 18_000, // 30 minutes
+    stormTicks: 1_800, // the Final Storm is the last 3 minutes
     scoreboardTicks: 300,
     lightningEveryTicks: 20,
     lightningDamage: 40,
