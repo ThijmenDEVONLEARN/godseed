@@ -5,7 +5,7 @@ import type { GodEffect } from '../config/gifts';
 
 export type { Team };
 
-export enum Tile { DeepWater, Water, Sand, Grass, Forest, Hills, Mountain, Farmland, Road, Ruins, Burnt, Bridge }
+export enum Tile { DeepWater, Water, Sand, Grass, Forest, Hills, Mountain, Farmland, Road, Ruins, Burnt, Bridge, Plinth }
 export enum Deposit { None, Tree, Stone, Iron, Gold }
 
 export type Resource = 'wood' | 'stone' | 'food' | 'gold' | 'iron';
@@ -130,6 +130,8 @@ export interface RoundState {
   phase: 'play' | 'storm' | 'scoreboard';
   phaseUntil: number;
   winner?: Team;
+  /** Best viewer of the round, set when it ends; the next world puts up their statue. */
+  mvp?: { viewerId: string; name: string; team: Team };
 }
 
 export interface ActiveEffect {
@@ -174,6 +176,8 @@ export interface World {
   effects: ActiveEffect[];
   /** Current chief per team (unit id). */
   leaders: Partial<Record<Team, number>>;
+  /** Stone statue of last round's MVP on a 2x2 plinth (top-left tile), render-only; the plinth tiles block walking. */
+  statue?: { x: number; y: number; viewerId: string; name: string; team: Team };
   /** Open world vote: options, one ballot per viewer (last one counts), closing tick. */
   vote?: { options: VoteId[]; ballots: Record<string, 1 | 2 | 3>; until: number };
 }

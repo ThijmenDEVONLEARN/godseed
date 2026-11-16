@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../config/balance';
 import { hashValue } from '../hash';
 import { createSimulation } from '../Simulation';
+import { walkableTile } from '../grid';
 import { newRound } from '../systems/round';
 
 const run = (seed: number, ticks: number) => {
@@ -81,5 +82,22 @@ describe('viewer units', () => {
     const u = sim.world.units.find((x) => x.viewerId === 'w')!;
     expect(u.job.kind).not.toBe('idle');
     expect(u.x !== sim.world.teams.green.homeX || u.y !== sim.world.teams.green.homeY).toBe(true);
+  });
+
+  it('puts up a statue of the best viewer in the next world, on tiles nobody can walk', () => {
+    const sim = createSimulation(3);
+    for (const [id, name] of [['a', 'Ann'], ['b', 'Bob']]) sim.enqueue({ kind: 'join', viewerId: id, name, team: 'red' });
+    sim.step();
+    sim.world.units.find((u) => u.viewerId === 'b')!.kills = 4;
+    sim.world.round.phase = 'storm';
+    sim.world.round.phaseUntil = sim.world.tick + 1;
+    sim.step(); sim.step();
+    expect(sim.world.round.mvp).toMatchObject({ viewerId: 'b', name: 'Bob', team: 'red' });
+    newRound(sim.world);
+    const st = sim.world.statue!;
+    expect(st).toMatchObject({ viewerId: 'b', name: 'Bob' });
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) expect(walkableTile(sim.world.tiles[(st.y + dy) * sim.world.w + st.x + dx])).toBe(false);
+    newRound(sim.world);
+    expect(sim.world.statue).toBeUndefined(); // nobody played that round
   });
 });

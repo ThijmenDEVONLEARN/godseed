@@ -4,11 +4,11 @@ import { Tile, type World } from '../sim/types';
 /** Ground height per tile kind; water sits at y = 0. One tile is one world unit. */
 const LEVEL: Record<Tile, number> = {
   [Tile.DeepWater]: -1.7, [Tile.Water]: -0.7, [Tile.Sand]: 0.14, [Tile.Grass]: 0.45, [Tile.Forest]: 0.5, [Tile.Hills]: 1.3,
-  [Tile.Mountain]: 3.6, [Tile.Farmland]: 0.45, [Tile.Road]: 0.42, [Tile.Ruins]: 0.45, [Tile.Burnt]: 0.45, [Tile.Bridge]: -0.7,
+  [Tile.Mountain]: 3.6, [Tile.Farmland]: 0.45, [Tile.Road]: 0.42, [Tile.Ruins]: 0.45, [Tile.Burnt]: 0.45, [Tile.Bridge]: -0.7, [Tile.Plinth]: 0.75,
 };
 const COLOR: Record<Tile, number> = {
   [Tile.DeepWater]: 0x2f78c4, [Tile.Water]: 0x7fb4dc, [Tile.Sand]: 0xead58a, [Tile.Grass]: 0x6cc24a, [Tile.Forest]: 0x56a83c, [Tile.Hills]: 0x9cb35a,
-  [Tile.Mountain]: 0x9a9da6, [Tile.Farmland]: 0xb98d42, [Tile.Road]: 0xc79d6a, [Tile.Ruins]: 0x8f927f, [Tile.Burnt]: 0x3a3530, [Tile.Bridge]: 0x7fb4dc,
+  [Tile.Mountain]: 0x9a9da6, [Tile.Farmland]: 0xb98d42, [Tile.Road]: 0xc79d6a, [Tile.Ruins]: 0x8f927f, [Tile.Burnt]: 0x3a3530, [Tile.Bridge]: 0x7fb4dc, [Tile.Plinth]: 0xc9c4b6,
 };
 const hash = (i: number) => (Math.imul(i ^ 0x9e3779b9, 2654435761) >>> 0) / 4294967296;
 

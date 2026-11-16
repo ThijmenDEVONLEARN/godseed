@@ -3,7 +3,9 @@ import { BALANCE } from '../../config/balance';
 import { aliveUnitsOf, buildingsOf, emit } from '../entities';
 import { fnv1a } from '../hash';
 import { startWorld } from '../setup';
-import { Tile, type Team, type World } from '../types';
+import { idx } from '../grid';
+import { reachable } from '../worldgen/generate';
+import { Deposit, Tile, type Team, type Unit, type World } from '../types';
 import { damageBuilding } from './combat';
 import { igniteTile } from './fire';
 import { cap } from './population';
@@ -14,6 +16,9 @@ export const STORM = 'The storm';
 
 /** A8: a tribe survives a disaster when it still has at least one finished building. */
 export const survived = (world: World, team: Team) => buildingsOf(world, team).some((b) => b.progress >= 1);
+
+/** A viewer's score for the round: 3 per kill, 2 if still alive (XP and the MVP use it). */
+export const viewerScore = (u: Unit) => 3 * u.kills + (u.alive ? 2 : 0);
 
 export function scoreOf(world: World, team: Team): number {
   const t = world.teams[team];
@@ -46,6 +51,8 @@ export function round(world: World): void {
     }
     const pop = (team: Team) => aliveUnitsOf(world, team).length;
     r.winner = [...TEAMS].sort((a, b) => world.teams[b].score - world.teams[a].score || pop(b) - pop(a))[0];
+    const best = world.units.filter((u) => u.viewerId && u.name).sort((a, b) => viewerScore(b) - viewerScore(a) || a.id - b.id)[0];
+    r.mvp = best && { viewerId: best.viewerId!, name: best.name!, team: best.team };
     r.phase = 'scoreboard';
     r.phaseUntil = world.tick + R.scoreboardTicks;
     emit(world, { kind: 'roundEnd', team: r.winner, text: `${cap(r.winner)} wins the round!` });
@@ -56,11 +63,26 @@ export function round(world: World): void {
 
 /** Replaces the world in place, so everything holding a reference to it keeps working. */
 export function newRound(world: World): void {
-  const tick = world.tick;
+  const tick = world.tick, mvp = world.round.mvp;
   const next = startWorld(fnv1a(`${world.seed + 1}`));
-  Object.assign(world, next, { tick, round: { startTick: tick, phase: 'play', phaseUntil: tick + R.roundTicks - R.stormTicks } });
+  Object.assign(world, next, { tick, statue: undefined, round: { startTick: tick, phase: 'play', phaseUntil: tick + R.roundTicks - R.stormTicks } });
+  if (mvp) placeStatue(world, mvp);
   for (const m of [...world.units, ...world.animals]) m.moveStartTick = tick;
   world.events.push({ tick, kind: 'newRound', text: 'A new world is born' });
+}
+
+/** The nearest free 2x2 of open grass to the centre becomes a plinth, unless that would cut a tribe off. */
+function placeStatue(world: World, mvp: NonNullable<World['round']['mvp']>): void {
+  const cx = world.w >> 1, cy = world.h >> 1, free = (k: number) => world.tiles[k] === Tile.Grass && world.deposits[k] === Deposit.None;
+  for (let r = 0; r < 16; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const x = cx + dx, y = cy + dy, ks = [idx(world.w, x, y), idx(world.w, x + 1, y), idx(world.w, x, y + 1), idx(world.w, x + 1, y + 1)];
+    if (x < 1 || y < 1 || x >= world.w - 2 || y >= world.h - 2 || !ks.every(free)) continue;
+    for (const k of ks) world.tiles[k] = Tile.Plinth;
+    const seen = reachable(world.tiles, world.w, world.h, idx(world.w, world.teams.red.homeX, world.teams.red.homeY));
+    if (TEAMS.every((t) => seen[idx(world.w, world.teams[t].homeX, world.teams[t].homeY)])) { world.statue = { x, y, ...mvp }; return; }
+    for (const k of ks) world.tiles[k] = Tile.Grass;
+  }
 }
 
 function lightning(world: World): void {
