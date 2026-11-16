@@ -1,3 +1,5 @@
+import type { Profile, RoundPlayer } from './profile';
+
 export type Team = 'red' | 'blue' | 'yellow' | 'green';
 export const TEAMS: readonly Team[] = ['red', 'blue', 'yellow', 'green'];
 
@@ -23,16 +25,23 @@ export interface RoundEnd {
   winner: Team;
   scores: Record<Team, number>;
   topPlayers: { name: string; team: Team; score: number }[];
+  /** Every viewer who played, for XP. */
+  players?: RoundPlayer[];
   endedAt: number;
 }
 
 /** game → bridge */
 export type GameMessage =
   | RoundEnd
+  /** Profiles of viewers the game has just seen; sent at most once a second. */
+  | { type: 'profileRequest'; ids: string[] }
   | { type: 'aiRequest'; id: string; kind: 'leaderSpeech' | 'chronicle' | 'wish'; payload: unknown };
 
 /** bridge → game */
 export type BridgeMessage =
   | { type: 'event'; event: ViewerEvent }
   | { type: 'highscores'; rounds: RoundEnd[] }
+  | { type: 'profiles'; profiles: Profile[] }
+  /** The five players with the most XP ever. */
+  | { type: 'leaderboard'; top: Profile[] }
   | { type: 'aiResponse'; id: string; ok: boolean; text?: string; action?: unknown };
