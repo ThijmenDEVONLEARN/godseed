@@ -22,6 +22,8 @@ export async function createPixiView(stage: HTMLElement) {
     bolt: (x: number, y: number) => view.bolt(x, y),
     point: (id: number, color: string) => view.point(id, color),
     gesture: (() => {}) as (id: number, name: string, ticks?: number) => void, // poses only exist in 3D
+    setCosmetic: (() => {}) as (viewerId: string, cos: { tier: number }) => void,
+    celebrate: (() => {}) as (unitId: number, levelUp: boolean) => void, // the gold beams only exist in 3D
     event: (e: SimEvent) => { if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y); },
     /** Puts the camera's tile (x, y) in the middle of the map zone at the given zoom, never showing past the map edge. */
     camera(_world: World, c: CameraTarget): void {

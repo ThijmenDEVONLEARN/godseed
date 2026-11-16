@@ -13,6 +13,7 @@ export async function create3DView(stage: HTMLElement, top: number, height: numb
     bolt: (x: number, y: number) => view.bolt(x, y),
     point: (id: number, color: string) => view.point(id, color),
     event: (e: SimEvent, world: World) => view.event(e, world),
+    celebrate: (unitId: number, levelUp: boolean) => view.celebrate(unitId, levelUp),
     fx: view.fx,
     gesture: (id: number, name: PoseName, ticks?: number) => view.gesture(id, name, ticks),
     setCosmetic: (viewerId: string, cos: Cosmetic) => view.setCosmetic(viewerId, cos),

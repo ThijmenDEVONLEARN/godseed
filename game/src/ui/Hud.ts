@@ -1,4 +1,4 @@
-import { TEAMS, type RoundEnd, type Team } from '@godseed/shared';
+import { TEAMS, type Profile, type Team } from '@godseed/shared';
 import { BALANCE } from '../config/balance';
 import { COMMANDS, HELP_SHOW_MS } from '../config/commands';
 import { VOTES } from '../config/votes';
@@ -7,6 +7,9 @@ import { PALETTE } from '../render/palette';
 import type { SimEvent, World } from '../sim/types';
 
 const FEED_KINDS = new Set<SimEvent['kind']>(['kill', 'raid', 'built', 'destroyed', 'join', 'fire', 'roundEnd', 'newRound', 'storm', 'info', 'god', 'leader']);
+
+/** A viewer's XP from the round that just ended, for the scoreboard. */
+export interface Earned { name: string; team: Team; xp: number }
 
 const el = (tag: string, cls: string, parent: HTMLElement, text = '') => {
   const e = document.createElement(tag);
@@ -83,8 +86,15 @@ export function createHud(ui: HTMLElement) {
     while (feed.childElementCount > 2) feed.firstElementChild!.remove();
   }
 
-  let highscores: RoundEnd[] = [];
+  let boardTimer: ReturnType<typeof setTimeout> | undefined;
+  const banner = (text: string, team?: Team, big = false) => {
+    queue.push({ text, team, big });
+    if (queue.length > 2) queue.shift(); // gift storm: skip the oldest so the banner never lags far behind
+    if (!showing) next();
+  };
   return {
+    banner,
+    board: showBoard,
     feed: line,
     connected(up: boolean): void { dot.classList.toggle('up', up); },
     help(): void {
@@ -92,7 +102,6 @@ export function createHud(ui: HTMLElement) {
       clearTimeout(helpTimer);
       helpTimer = setTimeout(() => { help.hidden = true; }, HELP_SHOW_MS);
     },
-    setHighscores(rounds: RoundEnd[]): void { highscores = rounds; },
     update(world: World): void {
       const r = world.round;
       const left = r.startTick + BALANCE.round.roundTicks - world.tick;
@@ -112,17 +121,13 @@ export function createHud(ui: HTMLElement) {
       for (const e of events) {
         if (!FEED_KINDS.has(e.kind) || (e.kind === 'storm' && e.x !== undefined)) continue;
         line(e.text, e.team);
-        if (e.kind === 'roundEnd') showBoard(world);
-        if (e.kind === 'god' || e.kind === 'leader' || (e.kind === 'storm' && e.x === undefined)) {
-          queue.push({ text: e.text, team: e.team, big: (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' || e.kind === 'storm' });
-          if (queue.length > 2) queue.shift(); // gift storm: skip the oldest so the banner never lags far behind
-          if (!showing) next();
-        }
+        if (e.kind === 'god' || e.kind === 'leader' || (e.kind === 'storm' && e.x === undefined)) banner(e.text, e.team, (e.durationTicks ?? 0) >= 60 || e.kind === 'leader' || e.kind === 'storm');
       }
     },
   };
 
-  function showBoard(world: World): void {
+  /** Team scores first; after 6 s the XP of the round and the all-time top 5 (by XP). */
+  function showBoard(world: World, earned: Earned[], top: () => Profile[]): void {
     board.replaceChildren();
     el('div', 'board-title', board, `${world.round.winner?.toUpperCase()} WINS!`).style.color = PALETTE.team[world.round.winner ?? 'red'];
     for (const team of [...TEAMS].sort((a, b) => world.teams[b].score - world.teams[a].score)) {
@@ -130,15 +135,23 @@ export function createHud(ui: HTMLElement) {
       el('span', '', row, team.toUpperCase()).style.color = PALETTE.team[team];
       el('span', '', row, String(world.teams[team].score));
     }
-    const best = highscores.flatMap((r) => r.topPlayers).sort((a, b) => b.score - a.score).slice(0, 5);
-    if (best.length) {
-      el('div', 'sub', board, 'ALL-TIME BEST PLAYERS');
-      for (const p of best) {
-        const row = el('div', 'board-row small', board);
-        el('span', '', row, p.name).style.color = PALETTE.team[p.team];
-        el('span', '', row, String(p.score));
-      }
-    }
     el('div', 'sub', board, 'A new world is coming...');
+    clearTimeout(boardTimer);
+    boardTimer = setTimeout(() => {
+      board.replaceChildren();
+      const list = (title: string, rows: { name: string; team?: Team; value: string }[]) => {
+        if (!rows.length) return;
+        el('div', 'sub', board, title);
+        for (const r of rows) {
+          const row = el('div', 'board-row small', board);
+          const name = el('span', '', row, r.name);
+          if (r.team) name.style.color = PALETTE.team[r.team];
+          el('span', '', row, r.value);
+        }
+      };
+      list('XP EARNED THIS ROUND', earned.slice(0, 3).map((e) => ({ name: e.name, team: e.team, value: `+${e.xp} XP` })));
+      list('ALL-TIME TOP 5', top().slice(0, 5).map((p) => ({ name: p.name, team: p.lastTeam, value: `Lv ${p.level} · ${p.xp} XP` })));
+      el('div', 'sub', board, 'A new world is coming...');
+    }, 6000);
   }
 }

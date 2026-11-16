@@ -28,10 +28,10 @@ const TOOL_HEAD: Record<Tool, { size: [number, number, number]; z: number; color
   axe: { size: [0.04, 0.22, 0.15], z: 0.4, color: 0xb8bec8 }, pick: { size: [0.05, 0.4, 0.06], z: 0.43, color: 0x5d6470 }, hoe: { size: [0.16, 0.15, 0.04], z: 0.44, color: 0x9aa0aa },
   hammer: { size: [0.13, 0.15, 0.13], z: 0.42, color: 0x6f6a64 }, sword: { size: [0.22, 0.05, 0.05], z: 0.06, color: 0xffcf3a },
 };
-const DEATH_TICKS = 26, RUIN_TICKS = 600;
+const DEATH_TICKS = 26, RUIN_TICKS = 600, STATUE_LABEL = -1;
 /** Level look of a viewer: 0 Villager, 1 Warrior (headband and feather), 2 Elder (pointed hat), 3 Legend (hat and cape). */
-export interface Cosmetic { tier: 0 | 1 | 2 | 3; top3?: boolean }
-interface Figure { x: number; y: number; z: number; face: number; scale: number; name: PoseName; t: number; seed: number; team: Team; tint: number; skin: number; hair: number; tool?: Tool; load?: number; crown?: boolean; cos?: Cosmetic }
+export interface Cosmetic { tier: 0 | 1 | 2 | 3; top3?: boolean; level?: number }
+interface Figure { x: number; y: number; z: number; face: number; scale: number; name: PoseName; t: number; seed: number; team: Team; tint: number; skin: number; hair: number; tool?: Tool; load?: number; crown?: boolean; cos?: Cosmetic; trousers?: number }
 const UP = new THREE.Vector3(0, 1, 0);
 const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ease3 = (k: number) => k * k * (3 - 2 * k);
@@ -68,7 +68,7 @@ export class WorldView3D {
   private head = instanced(VILLAGER.head, MAX_UNITS);
   private hair = instanced(VILLAGER.hair, MAX_UNITS);
   private arms = instanced(VILLAGER.arm, MAX_UNITS * 2);
-  private legs = instanced(VILLAGER.leg, MAX_UNITS * 2, 0x2b2d38);
+  private legs = instanced(VILLAGER.leg, MAX_UNITS * 2);
   private crowns = instanced(VILLAGER.crown, 8, 0xffcf3a);
   private cubes = instanced(VILLAGER.cube, MAX_UNITS * 3);
   private bands = instanced(VILLAGER.band, 64);
@@ -343,6 +343,7 @@ export class WorldView3D {
     this.arms.setColorAt(n * 2 + 1, this.c);
     put(this.legs, n * 2, legs, -0.11, 0.55, 0, ps.legL);
     put(this.legs, n * 2 + 1, legs, 0.11, 0.55, 0, ps.legR);
+    for (const i of [n * 2, n * 2 + 1]) this.legs.setColorAt(i, this.c.set(v.trousers ?? 0x2b2d38));
     const cube = (base: THREE.Matrix4, x: number, y: number, z: number, sx: number, sy: number, sz: number, color: number) => {
       if (this.n.cube >= this.cubes.instanceMatrix.count) return;
       put(this.cubes, this.n.cube, base, x, y, z, 0, 0, 0, sx, sy, sz);
@@ -407,7 +408,16 @@ export class WorldView3D {
       };
       this.villager(fig);
       this.last.set(u.id, fig);
-      if (u.name) this.label(u, x, y + scale * 1.75 + 0.35, z);
+      const level = u.viewerId ? this.cosmetics.get(u.viewerId)?.level : undefined;
+      if (u.name) this.label(u.id, level ? `${u.name} · Lv ${level}` : u.name, u.role === 'leader', x, y + scale * 1.75 + 0.35, z);
+    }
+    // last round's MVP as a stone statue on its plinth, with a sign
+    const st = world.statue;
+    if (st && this.n.unit < MAX_UNITS) {
+      const [sx, sy, sz] = this.at(st.x + 0.5, st.y + 0.5), stone = 0xb3aea2;
+      this.villager({ x: sx, y: sy, z: sz, face: 0, scale: 1.9, name: 'rally', t: 0, seed: 1, team: st.team, tint: stone, skin: stone, hair: 0x9d988c, tool: 'sword', trousers: stone, cos: this.cosmetics.get(st.viewerId) });
+      seen.add(STATUE_LABEL);
+      this.label(STATUE_LABEL, `${st.name} · MVP`, true, sx, sy + 3.9, sz);
     }
     // a unit that was here last frame and is gone now falls over where it stood
     for (const [id, fig] of this.last) if (!seen.has(id)) { this.dying.push({ fig, at: now }); this.last.delete(id); }
@@ -432,28 +442,28 @@ export class WorldView3D {
   /** Level look per viewer; fed from the player profiles. */
   setCosmetic(viewerId: string, cos: Cosmetic): void { this.cosmetics.set(viewerId, cos); }
 
-  private label(u: Unit, x: number, y: number, z: number): void {
-    let l = this.labels.get(u.id);
-    if (!l || l.text !== u.name) {
+  private label(id: number, text: string, gold: boolean, x: number, y: number, z: number): void {
+    let l = this.labels.get(id);
+    if (!l || l.text !== text) {
       if (l) { this.scene.remove(l.sprite); l.sprite.material.map?.dispose(); }
       const cv = document.createElement('canvas');
       cv.width = 512; cv.height = 96;
       const g = cv.getContext('2d')!;
-      g.font = `bold ${u.name!.length > 12 ? 44 : 54}px "Pixelify Sans", monospace`;
+      g.font = `bold ${text.length > 18 ? 36 : text.length > 12 ? 44 : 54}px "Pixelify Sans", monospace`;
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 12; g.strokeStyle = '#0d1019';
-      g.strokeText(u.name!, 256, 50);
-      g.fillStyle = u.role === 'leader' ? '#ffd75e' : '#ffffff';
-      g.fillText(u.name!, 256, 50);
+      g.strokeText(text, 256, 50);
+      g.fillStyle = gold ? '#ffd75e' : '#ffffff';
+      g.fillText(text, 256, 50);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true, sizeAttenuation: false }));
       sprite.scale.set(0.2, 0.0375, 1);
       sprite.renderOrder = 10;
       this.scene.add(sprite);
-      l = { sprite, text: u.name! };
-      this.labels.set(u.id, l);
+      l = { sprite, text };
+      this.labels.set(id, l);
     }
     l.sprite.position.set(x, y, z);
     // names only when the camera is close enough to read who is who, or when the unit is pointed at
-    l.sprite.visible = this.marks.has(u.id) || dist(this.camP, [x, y, z]) < 34;
+    l.sprite.visible = this.marks.has(id) || dist(this.camP, [x, y, z]) < 34;
   }
 
   private syncAnimals(world: World, now: number): void {
@@ -614,6 +624,17 @@ export class WorldView3D {
     this.eclipseSky.position.set(-22, 46, -150);
     this.eclipseSky.visible = false;
     this.cam.add(this.eclipseSky);
+  }
+
+  /** Gold beam on a viewer's villager: a returning player (welcome back) or a level-up with a shock wave. */
+  celebrate(unitId: number, levelUp: boolean): void {
+    const p = this.positions.get(unitId);
+    if (!p || !this.terrain) return;
+    const [x, y, z] = this.at(p.x, p.y);
+    this.fx.beam(x, z, 0xffd75e, 0.7, 2.2);
+    this.fx.p.burst(x, y + 1.2, z, levelUp ? 36 : 16, [0xffcf3a, 0xffffff], 2.5, 3, 1, 0.08, 4);
+    if (levelUp) { this.fx.shock(x, y, z, 4, 0xffd75e); this.gesture(unitId, 'cheer', 30); }
+    this.fx.sound(levelUp ? 'fanfare' : 'chime');
   }
 
   /** Glowing ring under a unit and its name shown, for !me, a join or a command. */

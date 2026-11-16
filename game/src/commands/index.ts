@@ -17,6 +17,8 @@ export interface CommandSinks {
   focus?(unitId: number, viewerId: string): void;
   /** Show the command list on screen (!help); the router keeps it to once a minute. */
   help?(): void;
+  /** The team a returning viewer played for last, so a bare !join puts them back there. */
+  lastTeam?(viewerId: string): Team | undefined;
 }
 
 /** Turns viewer events into sim commands and on-screen feedback. Gifts, likes, follows and shares get effects in phase 3. */
@@ -46,6 +48,7 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
           warned.delete(e.viewer.id);
           if (unit?.alive) { out.say(unit.id, e.text.trim().slice(0, 30)); out.focus?.(unit.id, e.viewer.id); }
         }
+        if (parsed.sim.kind === 'join' && !parsed.sim.team) parsed.sim.team = out.lastTeam?.(e.viewer.id);
         sim.enqueue(parsed.sim);
         return;
       }
