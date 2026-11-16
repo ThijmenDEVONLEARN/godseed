@@ -19,6 +19,9 @@ export const EFFECT_TEXT: Record<GodEffect, string> = {
   rain: 'made it rain', baby: 'blessed with a baby', goldChest: 'found a treasure chest for',
 };
 
+/** Test panel only: gift id -1 - i always plays effect i of this list. Real TikTok gift ids are positive. */
+export const TEST_EFFECTS = Object.keys(EFFECT_TEXT) as GodEffect[];
+
 export const GIFTS = {
   leaderPrice: 199,
   tiers: [

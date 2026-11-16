@@ -1,6 +1,7 @@
 import { TEAMS } from '@godseed/shared';
 import { describe, expect, it } from 'vitest';
-import { GIFTS, type GodEffect } from '../../config/gifts';
+import { BALANCE } from '../../config/balance';
+import { GIFTS, TEST_EFFECTS, type GodEffect } from '../../config/gifts';
 import { reachable } from '../worldgen/generate';
 import { applyGod, giftEffect } from '../god';
 import { createSimulation } from '../Simulation';
@@ -40,14 +41,24 @@ describe('god effects', () => {
     });
   }
 
-  it('meteor wrecks the strongest enemy village', () => {
+  it('meteor wrecks the strongest enemy village, after a moment to see it coming', () => {
     const sim = grown();
     const w = sim.world;
     w.teams.blue.score = 999;
-    const hpBefore = w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
+    const hp = () => w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
+    const hpBefore = hp();
     applyGod(w, 'meteor', 'red', 'Gina');
-    const hpAfter = w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
-    expect(hpAfter).toBeLessThan(hpBefore);
+    expect(hp()).toBe(hpBefore);
+    const god = w.events.find((e) => e.kind === 'god');
+    expect(god?.god).toBe('meteor');
+    expect(god?.spots).toHaveLength(1);
+    for (let i = 0; i < BALANCE.god.meteorFallTicks; i++) sim.step();
+    expect(hp()).toBeLessThan(hpBefore);
+  });
+
+  it('the test panel can pick any effect with a negative gift id', () => {
+    const w = grown().world;
+    TEST_EFFECTS.forEach((e, i) => expect(giftEffect(w, 1, -1 - i)).toBe(e));
   });
 
   it('the big gifts hurt the leading tribe and spare the giver', () => {

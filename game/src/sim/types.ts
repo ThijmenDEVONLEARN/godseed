@@ -1,6 +1,7 @@
 import type { Team } from '@godseed/shared';
 import type { Rng } from './rng';
 import type { VoteId } from '../config/votes';
+import type { GodEffect } from '../config/gifts';
 
 export type { Team };
 
@@ -118,6 +119,10 @@ export interface SimEvent {
   viewerId?: string;
   /** For 'god' events from a gift: what it was worth. */
   coins?: number;
+  /** For 'god' events: which god effect, so the view can play its animation. */
+  god?: GodEffect;
+  /** Where a god effect strikes (meteors, lava bombs, lightning), for the view. */
+  spots?: { x: number; y: number }[];
 }
 
 export interface RoundState {
@@ -128,7 +133,7 @@ export interface RoundState {
 }
 
 export interface ActiveEffect {
-  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood';
+  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood' | 'meteor';
   team: Team;
   until: number;
   x: number;

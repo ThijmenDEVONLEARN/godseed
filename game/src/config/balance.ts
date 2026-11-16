@@ -45,7 +45,7 @@ export const BALANCE = {
   guardRadius: 5,
   god: {
     heroHp: 300, heroDamage: 15, heroTicks: 1800, weaponBonus: 2, shieldHp: 30, buffTicks: 1200,
-    spawnCount: 6, meteorRadius: 3, meteorDamage: 100, wolfPack: 8, lightningDamage: 60,
+    spawnCount: 6, meteorRadius: 3, meteorFallTicks: 12, floodTicks: 150, meteorDamage: 100, wolfPack: 8, lightningDamage: 60,
     dragonTicks: 1200, dragonFireEvery: 20, tornadoDamage: 80, plagueTicks: 1200, plagueEvery: 10,
     volcanoRadius: 2, goldenAgeTicks: 1800, rainTicks: 300, goldChest: 10, rainOfGold: 20,
     /** 1-coin gifts also drop this much straight into the stock, so the help is there at once. */
