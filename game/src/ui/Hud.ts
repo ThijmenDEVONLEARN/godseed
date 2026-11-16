@@ -22,7 +22,7 @@ export function clock(ticks: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** DOM overlay: round clock and scores on top, gifts and event feed at the bottom, !help popup, scoreboard between rounds. */
+/** DOM overlay: round clock and scores on top, event feed at the bottom, !help popup, scoreboard between rounds. */
 export function createHud(ui: HTMLElement) {
   el('div', 'title', ui, 'GODSEED');
   const top = el('div', 'topbar', ui);
@@ -50,16 +50,8 @@ export function createHud(ui: HTMLElement) {
   }
   let helpTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // the gift list lives in a pinned comment on the live now, so only the feed stays down here
   const bottom = el('div', 'bottom', ui);
-  el('div', 'heading', bottom, 'GIFTS');
-  const gifts = el('div', 'gifts', bottom);
-  const rows: [string, string][] = GIFTS.tiers.map((t) => [`${t.minCoins}${t.minCoins > 1 ? '+' : ''}`, t.label]);
-  for (const [coins, label] of rows) {
-    const row = el('div', 'gift', gifts);
-    el('span', 'coins', row, coins);
-    el('span', '', row, label);
-  }
-  const social = el('div', 'social', bottom, GIFTS.social.join('   ·   '));
   const vignette = el('div', 'vignette', ui);
   vignette.hidden = true;
   const showcase = el('div', 'showcase', ui);
@@ -94,9 +86,6 @@ export function createHud(ui: HTMLElement) {
   let highscores: RoundEnd[] = [];
   return {
     feed: line,
-    likes(total: number): void {
-      social.textContent = `${GIFTS.social.join('   ·   ')}   ·   likes ${total % GIFTS.likesPerRain}/${GIFTS.likesPerRain}`;
-    },
     connected(up: boolean): void { dot.classList.toggle('up', up); },
     help(): void {
       help.hidden = false;

@@ -13,8 +13,6 @@ export interface CommandSinks {
   /** Arrow and stats bubble above a unit, for !me. */
   highlight(unitId: number): void;
   vote(viewerId: string, option: 1 | 2 | 3): void;
-  /** Like total, for the rain progress bar. */
-  likes(total: number): void;
   /** A viewer's command went through: put their villager on screen for a moment. */
   focus?(unitId: number, viewerId: string): void;
   /** Show the command list on screen (!help); the router keeps it to once a minute. */
@@ -63,7 +61,6 @@ export function createCommandRouter(sim: Simulation, out: CommandSinks) {
       case 'like': {
         const before = Math.floor(likes / GIFTS.likesPerRain);
         likes += e.count;
-        out.likes(likes);
         if (Math.floor(likes / GIFTS.likesPerRain) > before) sim.enqueue({ kind: 'god', viewerId: e.viewer.id, name: cleanName(e.viewer.name, e.viewer.id), effect: 'rain' });
         return;
       }

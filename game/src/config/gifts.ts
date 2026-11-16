@@ -38,5 +38,4 @@ export const GIFTS = {
   leaderGiftId: 0,
   leaderLabel: 'Become CHIEF of your team',
   likesPerRain: 100,
-  social: ['100 likes: rain', 'Follow: a baby is born', 'Share: gold chest'],
 };

@@ -47,7 +47,6 @@ const route = createCommandRouter(sim, {
     view.say(id, `${u.name} · ${u.team} · ${Math.ceil(u.hp)} hp · ${u.kills} kills`, 4000);
   },
   vote: (viewerId, option) => sim.enqueue({ kind: 'vote', viewerId, option }),
-  likes: (total) => hud.likes(total),
   focus: (unitId, viewerId) => camera.command(unitId, viewerId, performance.now()),
   help: () => hud.help(),
 });

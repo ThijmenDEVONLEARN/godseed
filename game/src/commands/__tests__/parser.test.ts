@@ -60,7 +60,7 @@ describe('cooldown', () => {
 describe('!help and the round clock', () => {
   it('shows the help popup at most once a minute, however many viewers ask', () => {
     let shown = 0;
-    const route = createCommandRouter(createSimulation(1), { feed() {}, say() {}, highlight() {}, vote() {}, likes() {}, help: () => shown++ });
+    const route = createCommandRouter(createSimulation(1), { feed() {}, say() {}, highlight() {}, vote() {}, help: () => shown++ });
     const ask = (i: number, now: number) => route({ type: 'chat', viewer: { id: `v${i}`, name: `V${i}` }, text: '!help', ts: now }, now);
     for (let i = 0; i < 5; i++) ask(i, 1000 + i * 5000);
     expect(shown).toBe(1);
