@@ -1,5 +1,5 @@
 import { Application, Graphics, TextureStyle } from 'pixi.js';
-import type { World } from '../sim/types';
+import type { SimEvent, World } from '../sim/types';
 import { MAP_TILES, SCREEN, TILE, ZONES } from '../ui/layout';
 import { createArt, T } from './art';
 import type { CameraTarget } from './Camera';
@@ -22,6 +22,7 @@ export async function createPixiView(stage: HTMLElement) {
     bolt: (x: number, y: number) => view.bolt(x, y),
     point: (id: number, color: string) => view.point(id, color),
     gesture: (() => {}) as (id: number, name: string, ticks?: number) => void, // poses only exist in 3D
+    event: (e: SimEvent) => { if (e.kind === 'storm' && e.x !== undefined && e.y !== undefined) view.bolt(e.x, e.y); },
     /** Puts the camera's tile (x, y) in the middle of the map zone at the given zoom, never showing past the map edge. */
     camera(_world: World, c: CameraTarget): void {
       const scale = (TILE / T) * c.zoom, tile = TILE * c.zoom;

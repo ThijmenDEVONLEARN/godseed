@@ -100,34 +100,3 @@ export function makeBuilding(type: BuildingType, team: Team): THREE.Group {
   }
   return g;
 }
-
-/** Placeholder god beasts for R1; the full models from the sketchbook come in R2/R4. */
-export function makeBeast(kind: 'dragon' | 'tornado' | 'titan'): { root: THREE.Group; animate(t: number): void; size: { rx: number; ry: number; lift: number } } {
-  const root = new THREE.Group();
-  if (kind === 'tornado') {
-    const rings: THREE.Mesh[] = [];
-    for (let i = 0; i < 10; i++) {
-      const m = part(new THREE.TorusGeometry(0.4 + i * 0.3, 0.16 + i * 0.02, 5, 12).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8d8a86, transparent: true, opacity: 0.6, flatShading: true, depthWrite: false }), root, 0, 0.4 + i * 0.8);
-      m.castShadow = false;
-      rings.push(m);
-    }
-    return { root, size: { rx: 3.4, ry: 4.4, lift: 4.2 }, animate: (t) => rings.forEach((r, i) => { r.rotation.y = t * (6 - i * 0.3); r.position.x = Math.sin(t * 3 + i * 0.5) * 0.12 * i; }) };
-  }
-  if (kind === 'titan') {
-    const stone = mat(0x7d8577), legs: THREE.Mesh[] = [], arms: THREE.Mesh[] = [];
-    part(new THREE.BoxGeometry(2.2, 2.6, 1.4), stone, root, 0, 4.3);
-    part(new THREE.BoxGeometry(1.1, 1, 1), stone, root, 0, 6.2);
-    part(new THREE.BoxGeometry(2.4, 0.3, 1.5), mat(0x5f7a4a), root, 0, 5.7);
-    for (const x of [-0.25, 0.25]) part(new THREE.BoxGeometry(0.2, 0.14, 0.05), new THREE.MeshBasicMaterial({ color: 0x8ff6ff }), root, x, 6.3, 0.52).castShadow = false;
-    for (const x of [-0.6, 0.6]) legs.push(part(new THREE.BoxGeometry(0.8, 3, 0.9).translate(0, -1.5, 0), stone, root, x, 3));
-    for (const x of [-1.5, 1.5]) arms.push(part(new THREE.BoxGeometry(0.6, 2.8, 0.7).translate(0, -1.4, 0), stone, root, x, 5.4));
-    return { root, size: { rx: 2, ry: 3.6, lift: 3.4 }, animate: (t) => { const s = Math.sin(t * 2.2) * 0.5; legs[0].rotation.x = s; legs[1].rotation.x = -s; arms[0].rotation.x = -s * 0.7; arms[1].rotation.x = s * 0.7; } };
-  }
-  const skin = mat(0x4a3570), wing = mat(0xe0703a, { side: THREE.DoubleSide }), wings: THREE.Mesh[] = [];
-  part(new THREE.BoxGeometry(0.9, 0.8, 2.6), skin, root);
-  part(new THREE.BoxGeometry(0.6, 0.55, 0.9), skin, root, 0, 0.5, 1.6);
-  part(new THREE.ConeGeometry(0.3, 1.8, 5).rotateX(-Math.PI / 2), skin, root, 0, 0, -2.1);
-  for (const s of [-1, 1]) wings.push(part(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0.9), new THREE.Vector3(0, 0, -0.9), new THREE.Vector3(s * 3.2, 0, -0.2)]), wing, root, s * 0.4, 0.3));
-  wings.forEach((w) => w.geometry.computeVertexNormals());
-  return { root, size: { rx: 3.4, ry: 1.6, lift: 6 }, animate: (t) => { const f = Math.sin(t * 5) * 0.6; wings[0].rotation.z = -f; wings[1].rotation.z = f; } };
-}

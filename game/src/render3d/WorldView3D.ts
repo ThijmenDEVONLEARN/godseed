@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 
 import type { CameraTarget, Track } from '../render/Camera';
+import { BALANCE } from '../config/balance';
 import { CAMERA } from '../config/camera';
 import type { Team } from '@godseed/shared';
-import { Deposit, Tile, type ActiveEffect, type BuildingType, type Mover, type Resource, type Unit, type World } from '../sim/types';
+import { Deposit, Tile, type ActiveEffect, type BuildingType, type Mover, type Resource, type SimEvent, type Unit, type World } from '../sim/types';
 import { isLand } from '../sim/grid';
 import { SCREEN } from '../ui/layout';
 import { centre, dist, fit, frame, guard, mix, type Shot, type Subject, type Vec3 } from './frame';
-import { BUILDING_SIZE, TEAM_COLOR, VILLAGER, makeBeast, makeBuilding, makeRuin, makeScaffold, mat } from './models';
+import { makeBeast, type Beast } from './beasts';
+import { playEvent, type Stage } from './events3d';
+import { Fx, rr } from './fx';
+import { BUILDING_SIZE, TEAM_COLOR, VILLAGER, makeBuilding, makeRuin, makeScaffold, mat } from './models';
 import { TOOL, pose, poseOf, type PoseName, type Tool } from './poses';
 import { Terrain } from './terrain';
 
@@ -29,6 +33,8 @@ const DEATH_TICKS = 26, RUIN_TICKS = 600;
 export interface Cosmetic { tier: 0 | 1 | 2 | 3; top3?: boolean }
 interface Figure { x: number; y: number; z: number; face: number; scale: number; name: PoseName; t: number; seed: number; team: Team; tint: number; skin: number; hair: number; tool?: Tool; load?: number; crown?: boolean; cos?: Cosmetic }
 const UP = new THREE.Vector3(0, 1, 0);
+const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ease3 = (k: number) => k * k * (3 - 2 * k);
 const hash = (i: number) => (Math.imul(i ^ 0x9e3779b9, 2654435761) >>> 0) / 4294967296;
 
 function instanced(geo: THREE.BufferGeometry, count: number, color = 0xffffff, shadow = true): THREE.InstancedMesh {
@@ -88,13 +94,20 @@ export class WorldView3D {
   private rain = instanced(new THREE.BoxGeometry(0.03, 0.7, 0.03), 500, 0xbfe3ff, false);
   private flood = new THREE.Mesh(new THREE.CircleGeometry(7.5, 24).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3f8fd8, transparent: true, opacity: 0.75, roughness: 0.3 }));
   private buildings = new Map<number, THREE.Group>();
-  private beasts = new Map<ActiveEffect['kind'], ReturnType<typeof makeBeast>>();
+  private beasts = new Map<ActiveEffect['kind'], Beast>();
+  /** Particles, shock waves, beams and bolts of the god effects (port of the sketchbook FX). */
+  readonly fx: Fx;
+  private wolfEars = instanced(new THREE.ConeGeometry(0.08, 0.2, 4), MAX_ANIMALS * 2);
+  private wolfEyes = instanced(new THREE.BoxGeometry(0.06, 0.06, 0.03), MAX_ANIMALS * 2, 0xffffff, false);
+  private drops = new Map<number, { until: number; dur: number }>();
+  private eclipseSky = new THREE.Group();
+  private moon!: THREE.Mesh;
+  private lastRender = 0;
+  private frameDt = 0;
   private labels = new Map<number, { sprite: THREE.Sprite; text: string }>();
   private marks = new Map<number, { ring: THREE.Mesh; until: number }>();
-  private bolts: { mesh: THREE.Mesh; until: number }[] = [];
   private faces = new Map<number, number>();
   private unitY = new Map<number, number>();
-  private flash = 0;
   private sky = new THREE.Color(SKY.day);
   private m = new THREE.Matrix4();
   private root = new THREE.Matrix4();
@@ -130,6 +143,10 @@ export class WorldView3D {
     this.rain.material = new THREE.MeshBasicMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.6 });
     for (const m of [this.bands, this.capes]) (m.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
     (this.stars.material as THREE.MeshStandardMaterial).emissive.set(0x8a6000);
+    this.fx = new Fx(this.scene, (x, z) => Math.max(0, this.terrain?.heightAt(x + this.w / 2, z + this.h / 2) ?? 0));
+    this.wolfEyes.material = new THREE.MeshBasicMaterial();
+    this.buildEclipseSky();
+    this.scene.add(this.cam, this.wolfEars, this.wolfEyes);
     this.scene.add(this.sun, this.hemi, water, this.flood, this.body, this.head, this.hair, this.arms, this.legs, this.crowns, this.cubes, this.bands, this.feathers, this.hats, this.capes, this.stars, this.animalLegs, this.sheep, this.animalHeads, this.trunks, this.leaves, this.rocks, this.fire, this.rain);
   }
 
@@ -174,6 +191,8 @@ export class WorldView3D {
     this.last.clear();
     this.gestures.clear();
     this.faces.clear();
+    this.drops.clear();
+    this.fx.clear();
     this.scatter(world);
     world.dirtyTiles = [];
   }
@@ -371,7 +390,9 @@ export class WorldView3D {
     for (const u of world.units) {
       if (!u.alive || this.n.unit >= MAX_UNITS) continue;
       seen.add(u.id);
-      const pl = this.place(u, now), [x, y, z] = this.at(pl.tx, pl.ty), sick = plague.has(u.team), scale = unitScale(u);
+      const pl = this.place(u, now), [x, ground, z] = this.at(pl.tx, pl.ty), sick = plague.has(u.team), scale = unitScale(u);
+      const drop = this.drops.get(u.id), falling = drop ? Math.max(0, (drop.until - performance.now()) / drop.dur) : 0, y = ground + falling * falling * 24;
+      if (drop && !falling) this.drops.delete(u.id);
       this.positions.set(u.id, { x: pl.tx, y: pl.ty });
       this.unitY.set(u.id, y);
       const g = this.gestures.get(u.id);
@@ -437,7 +458,8 @@ export class WorldView3D {
 
   private syncAnimals(world: World, now: number): void {
     const up = UP, p = new THREE.Vector3(), s = new THREE.Vector3();
-    let n = 0, legs = 0;
+    let n = 0, legs = 0, ears = 0;
+    const night = world.effects.some((e) => e.kind === 'eclipse');
     for (const a of world.animals) {
       if (!a.alive || n >= MAX_ANIMALS) continue;
       const pl = this.place(a, now), [x, y, z] = this.at(pl.tx, pl.ty), wolf = a.kind === 'wolf', k = wolf ? 0.72 : 0.62; // same scale as the villagers next to them
@@ -454,11 +476,21 @@ export class WorldView3D {
         this.animalLegs.setMatrixAt(legs, this.m.multiplyMatrices(body, local));
         this.animalLegs.setColorAt(legs++, this.c.set(wolf ? 0x4f545c : 0x2b2d38));
       }
+      // wolves get pointed ears and eyes that glow in the dark of an eclipse
+      if (wolf) for (const sx of [-1, 1]) {
+        local.makeTranslation(sx * 0.07, 0.58, 0.36);
+        this.wolfEars.setMatrixAt(ears, this.m.multiplyMatrices(body, local));
+        this.wolfEars.setColorAt(ears, this.c.set(0x4f545c));
+        local.makeTranslation(sx * 0.06, 0.46, 0.555);
+        this.wolfEyes.setMatrixAt(ears, this.m.multiplyMatrices(body, local));
+        this.wolfEyes.setColorAt(ears++, this.c.set(night ? 0xffd23a : 0x222222));
+      }
       n++;
     }
     this.animalLegs.count = legs;
     this.animalLegs.instanceMatrix.needsUpdate = true;
     if (this.animalLegs.instanceColor) this.animalLegs.instanceColor.needsUpdate = true;
+    for (const mesh of [this.wolfEars, this.wolfEyes]) { mesh.count = ears; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
     for (const mesh of [this.sheep, this.animalHeads]) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
   }
 
@@ -481,32 +513,47 @@ export class WorldView3D {
   }
 
   private syncEffects(world: World, now: number): void {
-    const t = now / 10, active = new Set<ActiveEffect['kind']>();
+    const t = now / 10, dt = Math.min(0.1, this.frameDt), active = new Set<ActiveEffect['kind']>();
     let dark = 0, flood: ActiveEffect | undefined;
     for (const e of world.effects) {
       const fade = Math.min(1, (e.until - now) / 20);
       if (e.kind === 'eclipse') dark = Math.max(dark, fade);
       if (e.kind === 'flood') flood = e;
+      // lasting clouds over a village: green plague mist, golden glitter
+      if (e.kind === 'plague' || e.kind === 'goldenAge') {
+        const [cx, cy, cz] = this.at(e.x, e.y), plague = e.kind === 'plague';
+        for (let i = 0; i < dt * (plague ? 30 : 40); i++) {
+          const px = cx + rr(-6, 6), pz = cz + rr(-6, 6);
+          this.fx.p.add(plague
+            ? { x: px, y: cy + rr(0, 1.2), z: pz, vx: rr(-0.3, 0.3), vy: rr(0.1, 0.4), vz: rr(-0.3, 0.3), c: Math.random() < 0.5 ? 0x8fcf6a : 0x6aa84a, life: rr(2, 3), s: rr(0.14, 0.28), grow: 1.5, floor: false }
+            : { x: px, y: cy + rr(0, 1), z: pz, vy: rr(1, 2.5), c: Math.random() < 0.5 ? 0xffd75e : 0xfff3b0, life: 2, s: 0.08, floor: false });
+        }
+      }
       if (e.kind !== 'dragon' && e.kind !== 'tornado' && e.kind !== 'titan') continue;
       active.add(e.kind);
       let b = this.beasts.get(e.kind);
       if (!b) { b = makeBeast(e.kind); this.beasts.set(e.kind, b); this.scene.add(b.root); b.root.position.set(...this.at(e.x, e.y)); }
-      const [x, y, z] = this.at(e.x, e.y), py = y + (e.kind === 'dragon' ? 6 + Math.sin(t * 1.3) * 0.8 : 0);
+      const [x, y, z] = this.at(e.x, e.y), py = e.kind === 'dragon' ? y + 6 + Math.sin(t * 1.3) * 0.8 : e.kind === 'titan' ? Math.max(-1.5, y - 0.3) : Math.max(0, y);
       const prev = b.root.position.clone();
       b.root.position.lerp(new THREE.Vector3(x, py, z), 0.12); // the sim moves beasts a tile at a time; this smooths it
       const dx = b.root.position.x - prev.x, dz = b.root.position.z - prev.z;
       if (e.kind !== 'tornado' && Math.hypot(dx, dz) > 0.002) b.root.rotation.y = Math.atan2(dx, dz);
-      b.animate(t);
+      b.update(t, dt, this.fx);
     }
     for (const [kind, b] of this.beasts) if (!active.has(kind)) { this.scene.remove(b.root); this.beasts.delete(kind); }
+    // flood water rises over the village in two seconds and drains in the last two
+    if (flood) {
+      const [x, , z] = this.at(flood.x, flood.y), level = Math.min(1, (now - (flood.until - BALANCE.god.floodTicks)) / 20, (flood.until - now) / 20);
+      this.flood.position.set(x, -0.3 + Math.max(0, level) * 1.05 + Math.sin(t * 2) * 0.05, z);
+      if (Math.random() < dt * 8) { const a = Math.random() * 6.28; this.fx.p.burst(x + Math.cos(a) * 7, 0.6, z + Math.sin(a) * 7, 6, [0xffffff, 0xbfe3ff], 1.5, 3, 0.6, 0.1, 10); }
+    }
     this.flood.visible = !!flood;
-    if (flood) { const [x, , z] = this.at(flood.x, flood.y); this.flood.position.set(x, 0.75 + Math.sin(t * 2) * 0.05, z); }
     const raining = world.tick < world.rainUntil, storm = world.round.phase === 'storm';
     this.sky.lerp(this.c.set(dark > 0.05 ? SKY.eclipse : storm ? SKY.storm : raining ? SKY.rain : SKY.day), 0.04);
     (this.scene.fog as THREE.Fog).color.copy(this.sky);
-    this.flash = Math.max(0, this.flash - 0.06);
-    this.sun.intensity = (storm ? 0.7 : raining ? 0.9 : 1.9) * (1 - dark * 0.92) + this.flash * 3;
-    this.hemi.intensity = (storm ? 0.75 : 1.1) * (1 - dark * 0.7) + this.flash;
+    const flash = this.fx.flash;
+    this.sun.intensity = (storm ? 0.7 : raining ? 0.9 : 1.9) * (1 - dark * 0.92) + flash * 3;
+    this.hemi.intensity = (storm ? 0.75 : 1.1) * (1 - dark * 0.7) + flash;
     const p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
     const drops = raining || storm ? 500 : 0;
     for (let i = 0; i < drops; i++) {
@@ -528,21 +575,45 @@ export class WorldView3D {
       mk.ring.rotation.z = ms / 300;
       mk.ring.scale.setScalar(1 + Math.sin(ms / 160) * 0.12);
     }
-    this.bolts = this.bolts.filter((b) => { if (ms <= b.until) { b.mesh.visible = Math.floor(ms / 60) % 2 === 0; return true; } this.scene.remove(b.mesh); return false; });
   }
 
   /** Chat balloons are gone in the 3D game (decision D4); a unit's name label is the feedback. */
   say(unitId: number, _text: string, ms = 3000): void { this.point(unitId, '#ffffff', ms); }
 
   /** A lightning bolt striking tile (x, y), with a flash that is felt even off-camera. */
-  bolt(tx: number, ty: number, ms = 350): void {
-    const [x, y, z] = this.at(tx, ty);
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 34, 5).translate(0, 17, 0), new THREE.MeshBasicMaterial({ color: 0xeaf6ff }));
-    mesh.position.set(x, y, z);
-    mesh.rotation.z = (hash(Math.floor(performance.now())) - 0.5) * 0.3;
-    this.scene.add(mesh);
-    this.bolts.push({ mesh, until: performance.now() + ms });
-    this.flash = 1;
+  bolt(tx: number, ty: number): void { const [x, , z] = this.at(tx, ty); this.fx.bolt(x, z); }
+
+  /** Plays the animation of a sim event (gifts, kills, fireworks); see events3d.ts. */
+  event(e: SimEvent, world: World): void { if (this.terrain) playEvent(this.fx, e, this.stage(world)); }
+
+  private stage(world: World): Stage {
+    return {
+      at: (tx, ty) => this.at(tx, ty),
+      unit: (id) => { const p = this.positions.get(id); return p && world.units.some((u) => u.id === id && u.alive) ? this.at(p.x, p.y) : undefined; },
+      gesture: (id, name, ticks) => this.gesture(id, name, ticks),
+      drop: (id, seconds) => this.drops.set(id, { until: performance.now() + seconds * 1000, dur: seconds * 1000 }),
+      cheer: (team) => { for (const u of world.units) if (u.alive && (!team || u.team === team)) this.gesture(u.id, 'cheer', 30); },
+      look: () => this.camL,
+      eclipse: (seconds) => this.fx.temp(seconds, (k, _dt, t) => {
+        this.eclipseSky.visible = true;
+        // the moon slides over the sun in three seconds and off again at the end
+        const cover = Math.min(1, t / 3, (1 - k) * seconds / 2);
+        this.moon.position.set((1 - ease3(cover)) * 13, (1 - ease3(cover)) * -4, 0.1);
+      }, undefined, () => { this.eclipseSky.visible = false; }),
+    };
+  }
+
+  /** Sun and moon for the eclipse, hung in the sky at the top of the frame (the camera mostly looks down). */
+  private buildEclipseSky(): void {
+    const disc = (r: number, color: number, blend = false) => new THREE.Mesh(new THREE.CircleGeometry(r, 32), new THREE.MeshBasicMaterial({ color, fog: false, depthTest: false, depthWrite: false, transparent: true, blending: blend ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    const corona = disc(9.5, 0xffe9a0, true), sun = disc(6.5, 0xfff2b0);
+    (corona.material as THREE.MeshBasicMaterial).opacity = 0.35;
+    this.moon = disc(6.7, 0x141a2a);
+    corona.renderOrder = 997; sun.renderOrder = 998; this.moon.renderOrder = 999;
+    this.eclipseSky.add(corona, sun, this.moon);
+    this.eclipseSky.position.set(-22, 46, -150);
+    this.eclipseSky.visible = false;
+    this.cam.add(this.eclipseSky);
   }
 
   /** Glowing ring under a unit and its name shown, for !me, a join or a command. */
@@ -631,6 +702,9 @@ export class WorldView3D {
     this.camP[1] = Math.max(this.camP[1], this.topAt(world)(this.camP[0], this.camP[2]) + 2);
     this.cam.position.set(...this.camP);
     this.cam.lookAt(...this.camL);
+    // impacts shake the picture a little (never with reduced motion)
+    const jolt = REDUCED_MOTION ? 0 : this.fx.shake * this.fx.shake * 0.35;
+    if (jolt > 0.001) this.cam.position.add(new THREE.Vector3(rr(-jolt, jolt), rr(-jolt, jolt), rr(-jolt, jolt)));
   }
 
   /** Fixed camera in tile coordinates, for the catalogue; the game uses `camera()` with the framing rule. */
@@ -645,6 +719,12 @@ export class WorldView3D {
   /** Turns a standing unit; walking units face where they go. */
   turn(id: number, angle: number): void { this.faces.set(id, angle); }
 
-  render(): void { this.renderer.render(this.scene, this.cam); }
+  render(): void {
+    const ms = performance.now();
+    this.frameDt = this.lastRender ? Math.min(0.1, (ms - this.lastRender) / 1000) : 0;
+    this.lastRender = ms;
+    this.fx.update(this.frameDt);
+    this.renderer.render(this.scene, this.cam);
+  }
 }
 
