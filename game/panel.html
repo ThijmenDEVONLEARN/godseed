@@ -8,6 +8,7 @@
       body { font: 16px system-ui, sans-serif; background: #10141c; color: #eef; margin: 0; padding: 20px; max-width: 720px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
       p.hint { color: #aab4c4; margin: 0 0 16px; }
+      span.hint { color: #aab4c4; font-size: 0.85em; }
       fieldset { border: 1px solid #ffffff26; border-radius: 8px; margin: 0 0 14px; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
       legend { color: #aab4c4; padding: 0 6px; }
       input, select, button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #ffffff33; background: #1a2233; color: #eef; }
@@ -45,6 +46,12 @@
         <option value="500">God · 500 coins</option>
       </select>
       <button id="sendGift">Send gift</button>
+    </fieldset>
+    <fieldset>
+      <legend>Any god effect (test only)</legend>
+      <select id="effect" aria-label="god effect"></select>
+      <button id="sendEffect">Play effect</button>
+      <span class="hint">Gifts under 20 coins do not move the camera, like on the live.</span>
     </fieldset>
     <fieldset>
       <legend>Spam test</legend>
