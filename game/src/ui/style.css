@@ -11,7 +11,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .clock.storm { color: #ff8a1f; }
 .score { display: flex; align-items: center; gap: 12px; font-size: 36px; }
 .swatch { width: 20px; height: 20px; border: 3px solid #111; display: inline-block; }
-.topbar .sub { position: absolute; left: 36px; bottom: 6px; font-size: 20px; font-weight: 400; color: #aab4c4; }
+.topbar .sub { position: absolute; left: 36px; bottom: 4px; font-size: 24px; font-weight: 400; color: #d6dde8; }
 
 .bottom { position: absolute; top: 1392px; left: 0; right: 0; height: 528px; background: rgba(16, 20, 28, .92); padding: 6px 36px; box-sizing: border-box; }
 .heading { font-size: 24px; color: #aab4c4; margin-top: 2px; }
@@ -25,6 +25,7 @@ html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; }
 .social { margin-top: 4px; font-size: 24px; color: #9fe7ff; border-bottom: 2px solid #ffffff22; padding-bottom: 4px; }
 .feed { margin-top: 4px; font-size: 24px; font-weight: 400; line-height: 28px; }
 
+.help { position: absolute; top: 620px; left: 48px; right: 48px; background: rgba(16, 20, 28, .95); border: 6px solid #ffe066; padding: 20px 32px; animation: pop .35s ease-out; }
 .board { position: absolute; top: 560px; left: 140px; right: 140px; background: rgba(16, 20, 28, .95); border: 4px solid #111; padding: 36px 48px; text-align: center; }
 .board-title { font-size: 72px; margin-bottom: 24px; }
 .board-row { display: flex; justify-content: space-between; font-size: 44px; line-height: 64px; }

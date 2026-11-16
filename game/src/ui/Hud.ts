@@ -1,6 +1,6 @@
 import { TEAMS, type RoundEnd, type Team } from '@godseed/shared';
 import { BALANCE } from '../config/balance';
-import { COMMANDS } from '../config/commands';
+import { COMMANDS, HELP_SHOW_MS } from '../config/commands';
 import { VOTES } from '../config/votes';
 import { GIFTS } from '../config/gifts';
 import { PALETTE } from '../render/palette';
@@ -16,13 +16,13 @@ const el = (tag: string, cls: string, parent: HTMLElement, text = '') => {
   return e;
 };
 
-function clock(ticks: number): string {
-  const s = Math.max(0, Math.ceil(ticks / BALANCE.ticksPerSecond)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
-  const mm = String(m).padStart(h ? 2 : 1, '0'), ss = String(s % 60).padStart(2, '0');
-  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+/** Round time as mm:ss, counted in sim ticks so it stays right when the game runs faster (?speed). */
+export function clock(ticks: number): string {
+  const s = Math.max(0, Math.ceil(ticks / BALANCE.ticksPerSecond));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** DOM overlay: round clock and scores on top, commands and event feed at the bottom, scoreboard between rounds. */
+/** DOM overlay: round clock and scores on top, gifts and event feed at the bottom, !help popup, scoreboard between rounds. */
 export function createHud(ui: HTMLElement) {
   el('div', 'title', ui, 'GODSEED');
   const top = el('div', 'topbar', ui);
@@ -36,16 +36,21 @@ export function createHud(ui: HTMLElement) {
   });
   const sub = el('div', 'sub', top);
 
-  const bottom = el('div', 'bottom', ui);
-  el('div', 'heading', bottom, 'COMMANDS');
-  const grid = el('div', 'commands', bottom);
+  // the commands only show when a viewer types !help, so the map gets the room
+  const help = el('div', 'help', ui);
+  help.hidden = true;
+  el('div', 'heading', help, 'COMMANDS');
+  const grid = el('div', 'commands', help);
   for (const c of COMMANDS) if (!('chief' in c)) el('span', '', grid, c.usage).title = c.help;
-  el('div', 'heading chief', bottom, `CHIEF: gift ${GIFTS.leaderPrice} coins to lead your tribe and use`);
-  const chief = el('div', 'commands chief', bottom);
+  el('div', 'heading chief', help, `CHIEF: gift ${GIFTS.leaderPrice} coins to lead your tribe and use`);
+  const chief = el('div', 'commands chief', help);
   for (const c of COMMANDS) if ('chief' in c) {
     const row = el('span', '', chief, c.usage);
     el('span', 'what', row, ` ${c.short}`);
   }
+  let helpTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const bottom = el('div', 'bottom', ui);
   el('div', 'heading', bottom, 'GIFTS');
   const gifts = el('div', 'gifts', bottom);
   const rows: [string, string][] = GIFTS.tiers.map((t) => [`${t.minCoins}${t.minCoins > 1 ? '+' : ''}`, t.label]);
@@ -93,6 +98,11 @@ export function createHud(ui: HTMLElement) {
       social.textContent = `${GIFTS.social.join('   ·   ')}   ·   likes ${total % GIFTS.likesPerRain}/${GIFTS.likesPerRain}`;
     },
     connected(up: boolean): void { dot.classList.toggle('up', up); },
+    help(): void {
+      help.hidden = false;
+      clearTimeout(helpTimer);
+      helpTimer = setTimeout(() => { help.hidden = true; }, HELP_SHOW_MS);
+    },
     setHighscores(rounds: RoundEnd[]): void { highscores = rounds; },
     update(world: World): void {
       const r = world.round;
@@ -105,7 +115,7 @@ export function createHud(ui: HTMLElement) {
       if (v) {
         const counts = [1, 2, 3].map((n) => Object.values(v.ballots).filter((b) => b === n).length);
         sub.textContent = `VOTE ${clock(v.until - world.tick)}  ${v.options.map((o, i) => `!vote ${i + 1} ${VOTES.options[o]} (${counts[i]})`).join('  ')}`;
-      } else sub.textContent = r.phase === 'storm' ? 'FINAL STORM! Survive until the end' : 'Type !join red / blue / yellow / green to get your own villager';
+      } else sub.textContent = r.phase === 'storm' ? 'FINAL STORM! Survive until the end' : 'Type !help for the commands  ·  !join red / blue / yellow / green to play';
       TEAMS.forEach((team, i) => { scores[i].textContent = String(world.teams[team].score); });
       board.hidden = r.phase !== 'scoreboard';
     },

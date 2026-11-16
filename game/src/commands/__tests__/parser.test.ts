@@ -1,6 +1,9 @@
 import { cleanName } from '@godseed/shared';
 import { describe, expect, it } from 'vitest';
 import { createSimulation } from '../../sim/Simulation';
+import { createCommandRouter } from '..';
+import { BALANCE } from '../../config/balance';
+import { clock } from '../../ui/Hud';
 import { createCooldown } from '../cooldown';
 import { parseChat } from '../parser';
 
@@ -18,6 +21,7 @@ describe('parseChat', () => {
     for (const o of ['chop', 'mine', 'farm', 'defend', 'march', 'pray']) expect(p(`!${o}`)).toMatchObject({ sim: { kind: 'order', order: o } });
     expect(p('!burn')).toMatchObject({ sim: { kind: 'burn' } });
     expect(p('!me')).toEqual({ ui: 'me' });
+    expect(p('!help')).toEqual({ ui: 'help' });
     expect(p('!rename Kees')).toMatchObject({ sim: { kind: 'rename', name: 'Kees' } });
     expect(p('!vote 2')).toEqual({ vote: 2 });
   });
@@ -50,5 +54,24 @@ describe('cooldown', () => {
     expect(cd('a', 4000)).toBe(6);
     expect(cd('b', 4000)).toBe(0);
     expect(cd('a', 10_000)).toBe(0);
+  });
+});
+
+describe('!help and the round clock', () => {
+  it('shows the help popup at most once a minute, however many viewers ask', () => {
+    let shown = 0;
+    const route = createCommandRouter(createSimulation(1), { feed() {}, say() {}, highlight() {}, vote() {}, likes() {}, help: () => shown++ });
+    const ask = (i: number, now: number) => route({ type: 'chat', viewer: { id: `v${i}`, name: `V${i}` }, text: '!help', ts: now }, now);
+    for (let i = 0; i < 5; i++) ask(i, 1000 + i * 5000);
+    expect(shown).toBe(1);
+    ask(9, 61_000);
+    expect(shown).toBe(2);
+  });
+
+  it('a round lasts 30 minutes and the clock reads mm:ss', () => {
+    expect(BALANCE.round.roundTicks / BALANCE.ticksPerSecond).toBe(30 * 60);
+    expect(BALANCE.round.stormTicks / BALANCE.ticksPerSecond).toBe(3 * 60);
+    expect(clock(BALANCE.round.roundTicks)).toBe('30:00');
+    expect(clock(95)).toBe('00:10');
   });
 });

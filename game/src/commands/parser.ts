@@ -8,7 +8,7 @@ const ORDERS = ['chop', 'mine', 'farm', 'defend', 'march', 'pray'] as const;
 /** Parsed chat: a sim command, a UI-only action, an error to show, or plain chat (null). */
 export type Parsed =
   | { sim: SimCommand }
-  | { ui: 'me' }
+  | { ui: 'me' | 'help' }
   | { vote: 1 | 2 | 3 }
   | { error: string }
   | null;
@@ -44,6 +44,8 @@ export function parseChat(text: string, viewer: Viewer, world: World): Parsed {
       return { sim: { kind: 'burn', viewerId } };
     case 'me':
       return { ui: 'me' };
+    case 'help':
+      return { ui: 'help' };
     case 'rename': {
       const raw = t.split(/\s+/).slice(1).join('');
       if (!raw.replace(/[^A-Za-z0-9_]/g, '') || hasBadWord(raw)) return { error: `${viewer.name}: !rename <newname>` };
