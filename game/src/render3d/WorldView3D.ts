@@ -22,6 +22,8 @@ const SKY = { day: 0xa9d6f0, rain: 0x7d8a98, storm: 0x4a3436, eclipse: 0x18213a 
 const unitScale = (u: Unit) => (u.role === 'hero' ? 1.15 : u.role === 'leader' ? 0.85 : 0.62);
 /** The overview may use nearly the whole view; the HUD sits outside the 3D view for now. */
 const WIDE = { x: 0.985, y0: -0.985, y1: 0.985 };
+/** How much nearer than "the whole coast just fits" the overview flies. */
+const OVERVIEW_CLOSER = 0.15;
 const LOAD: Record<Resource, number> = { wood: 0x8a5a2b, stone: 0x9aa0aa, food: 0xe2c044, gold: 0xffcf3a, iron: 0x7f8fa6 };
 /** Head of each tool at the end of the handle: size and colour. The sword turns the handle into the blade. */
 const TOOL_HEAD: Record<Tool, { size: [number, number, number]; z: number; color: number }> = {
@@ -130,7 +132,7 @@ export class WorldView3D {
     this.cam.aspect = SCREEN.w / height;
     this.cam.updateProjectionMatrix();
     this.scene.background = this.sky;
-    this.scene.fog = new THREE.Fog(SKY.day, 110, 260);
+    this.scene.fog = new THREE.Fog(SKY.day, 150, 300);
     this.sun.position.set(-40, 70, 30);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -688,15 +690,18 @@ export class WorldView3D {
   camera(world: World, c: CameraTarget, focus: { x: number; y: number; zoomed: boolean; track?: Track }, dtMs: number): void {
     if (!this.terrain) return;
     const t = performance.now() / 1000, dt = Math.min(0.1, dtMs / 1000), k = Math.min(1, Math.max(0, (c.zoom - 1) / 1.1));
-    // overview: the island just fills the view, seen steeply (about 67°) so its length uses the height of the view too. The guard only backs off, so start too close and let it stop at the first fit.
-    const mid = centre(this.coast);
-    let over = guard({ p: [mid[0] + Math.sin(t * 0.045) * 2, 14, mid[2] + 6], l: [mid[0], 0, mid[2]] }, this.coast, this.lens, WIDE);
+    // overview: a slow flight round the island (a lap in about two minutes), seen steeply (about 67°).
+    // The guard only backs off, so start too close and let it stop at the first fit.
+    const mid = centre(this.coast), yaw = t * 0.05;
+    let over = guard({ p: [mid[0] + Math.sin(yaw) * 6, 14, mid[2] + Math.cos(yaw) * 6], l: [mid[0], 0, mid[2]] }, this.coast, this.lens, WIDE);
     // the guard backs off in coarse steps; creep back in until the coast touches the edge
     for (let i = 0; i < 12; i++) {
       const nearer: Shot = { l: over.l, p: mix(over.p, over.l, 0.015) };
       if (fit(nearer, this.coast, this.lens, WIDE) > 1) break;
       over = nearer;
     }
+    // Dev wants it a bit closer than the whole coast: the outer edge drifts in and out of view as the camera circles
+    over = { l: over.l, p: mix(over.p, over.l, OVERVIEW_CLOSER) };
     const [x, y, z] = this.at(c.x, c.y), d = 24 / c.zoom, az = Math.sin(t * 0.12) * 0.5, el = 0.56;
     const close: Shot = { l: [x, y + 1, z], p: [x + Math.sin(az) * Math.cos(el) * d, y + 1 + Math.sin(el) * d, z + Math.cos(az) * Math.cos(el) * d] };
     const ease = k * k * (3 - 2 * k);
