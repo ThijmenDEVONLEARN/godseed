@@ -3,7 +3,7 @@ import type { BuildingType, Resource } from '../sim/types';
 /** Every gameplay number lives here. Ticks are 1/10 s. */
 export const BALANCE = {
   ticksPerSecond: 10,
-  map: { w: 64, h: 72 },
+  map: { w: 80, h: 90 },
   startStock: { wood: 30, stone: 10, food: 40, gold: 0, iron: 0 } as Record<Resource, number>,
   startNpcs: 8,
   npcMin: 8,
@@ -34,7 +34,8 @@ export const BALANCE = {
 
   moveTicks: { default: 2, forest: 3, hills: 3, road: 1, wallClimb: 20 },
   pathBudgetPerTick: 30,
-  pathMaxExpansions: 2000,
+  huntRetryTicks: 300, // 30 s of other work after a sheep turned out unreachable
+  pathMaxExpansions: 7200, // the whole 80x90 map, so a far target is never 'unreachable' by budget alone
 
   unit: { workerHp: 30, warriorHp: 50, workerDamage: 2, warriorDamage: 5, hitEveryTicks: 10, smithyBonus: 1.5, viewerRespawnTicks: 300 },
   tower: { range: 6, damage: 3, everyTicks: 10 },
@@ -44,9 +45,23 @@ export const BALANCE = {
   guardRadius: 5,
   god: {
     heroHp: 300, heroDamage: 15, heroTicks: 1800, weaponBonus: 2, shieldHp: 30, buffTicks: 1200,
-    spawnCount: 6, meteorRadius: 3, meteorDamage: 100, wolfPack: 6, lightningDamage: 60,
+    spawnCount: 6, meteorRadius: 3, meteorFallTicks: 12, floodTicks: 150, meteorDamage: 100, wolfPack: 8, lightningDamage: 60,
     dragonTicks: 1200, dragonFireEvery: 20, tornadoDamage: 80, plagueTicks: 1200, plagueEvery: 10,
     volcanoRadius: 2, goldenAgeTicks: 1800, rainTicks: 300, goldChest: 10, rainOfGold: 20,
+    /** 1-coin gifts also drop this much straight into the stock, so the help is there at once. */
+    spawnStock: 15,
+    /** Wolves from a gift (pack, eclipse) are tougher than forest wolves. */
+    packWolfHp: 45,
+    /** Shield gift: hit points back on every building of the giver's tribe. */
+    shieldRepair: 40,
+    /** Flood: damage to every enemy building near its village, and how far it reaches. */
+    floodDamage: 45, floodRadius: 7,
+    /** How far from the centre towards the strongest enemy the volcano rises (0 = centre, 1 = their village). */
+    volcanoReach: 0.75, lavaBombs: 5,
+    /** Gold rain: what the giver's own tribe gets on top of everyone's gold. */
+    rainOfGoldBonus: 25,
+    /** Rain also waters the fields: food for every tribe. */
+    rainFood: 10,
   },
 
   brain: { everyTicks: 50, raidEveryTicks: 1500, raidChance: 0.3, raidWorkerShare: 0.2, threatMemoryTicks: 200, defendRadius: 6 },
@@ -54,8 +69,8 @@ export const BALANCE = {
   animals: { sheepStart: 14, sheepFood: 5, wolfEveryTicks: 1000, wolfMax: 6, wolfHp: 20, wolfDamage: 3, wolfAggroRange: 5, sheepHp: 6 },
 
   round: {
-    roundTicks: 72_000,
-    stormTicks: 6_000,
+    roundTicks: 18_000, // 30 minutes
+    stormTicks: 1_800, // the Final Storm is the last 3 minutes
     scoreboardTicks: 300,
     lightningEveryTicks: 20,
     lightningDamage: 40,

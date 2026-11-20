@@ -1,10 +1,11 @@
 import type { Team } from '@godseed/shared';
 import type { Rng } from './rng';
 import type { VoteId } from '../config/votes';
+import type { GodEffect } from '../config/gifts';
 
 export type { Team };
 
-export enum Tile { DeepWater, Water, Sand, Grass, Forest, Hills, Mountain, Farmland, Road, Ruins, Burnt, Bridge }
+export enum Tile { DeepWater, Water, Sand, Grass, Forest, Hills, Mountain, Farmland, Road, Ruins, Burnt, Bridge, Plinth }
 export enum Deposit { None, Tree, Stone, Iron, Gold }
 
 export type Resource = 'wood' | 'stone' | 'food' | 'gold' | 'iron';
@@ -16,7 +17,7 @@ export type Order = 'chop' | 'mine' | 'farm' | 'defend' | 'march' | 'pray';
 export type Job =
   | { kind: 'idle' }
   | { kind: 'gather'; res: Resource; stage: 'go' | 'work' | 'return'; tx: number; ty: number; workLeft: number }
-  | { kind: 'build'; targetId: number }
+  | { kind: 'build'; targetId: number; /** a viewer's own !build */ ordered?: boolean }
   | { kind: 'attack'; team: Team; targetId: number; targetIsUnit: boolean; burn?: boolean }
   | { kind: 'guard'; x: number; y: number }
   | { kind: 'pray'; workLeft: number }
@@ -52,11 +53,15 @@ export interface Unit extends Mover {
   job: Job;
   nextHitTick: number;
   kills: number;
+  /** Work in hundredths of a point (whole numbers, so no float drift): 1 point per 5 loads brought home, 2 per whole building's worth of building; half without a viewer's order. */
+  work: number;
   respawnAt?: number;
   /** Gift buff on a viewer unit. */
   buff?: { kind: 'weapon' | 'shield'; until: number };
   /** Heroes vanish at this tick. */
   expiresAt?: number;
+  /** No hunting before this tick: the last sheep could not be reached. */
+  noHuntUntil?: number;
 }
 
 export interface Building {
@@ -112,6 +117,14 @@ export interface SimEvent {
   durationTicks?: number;
   /** For 'god' events with a moving effect, so the camera can follow it. */
   effect?: ActiveEffect['kind'];
+  /** The viewer behind it (join, gift, new chief). */
+  viewerId?: string;
+  /** For 'god' events from a gift: what it was worth. */
+  coins?: number;
+  /** For 'god' events: which god effect, so the view can play its animation. */
+  god?: GodEffect;
+  /** Where a god effect strikes (meteors, lava bombs, lightning), for the view. */
+  spots?: { x: number; y: number }[];
 }
 
 export interface RoundState {
@@ -119,10 +132,12 @@ export interface RoundState {
   phase: 'play' | 'storm' | 'scoreboard';
   phaseUntil: number;
   winner?: Team;
+  /** Best viewer of the round, set when it ends; the next world puts up their statue. */
+  mvp?: { viewerId: string; name: string; team: Team };
 }
 
 export interface ActiveEffect {
-  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood';
+  kind: 'dragon' | 'tornado' | 'plague' | 'goldenAge' | 'titan' | 'eclipse' | 'flood' | 'meteor';
   team: Team;
   until: number;
   x: number;
@@ -163,6 +178,8 @@ export interface World {
   effects: ActiveEffect[];
   /** Current chief per team (unit id). */
   leaders: Partial<Record<Team, number>>;
+  /** Stone statue of last round's MVP on a 2x2 plinth (top-left tile), render-only; the plinth tiles block walking. */
+  statue?: { x: number; y: number; viewerId: string; name: string; team: Team };
   /** Open world vote: options, one ballot per viewer (last one counts), closing tick. */
   vote?: { options: VoteId[]; ballots: Record<string, 1 | 2 | 3>; until: number };
 }

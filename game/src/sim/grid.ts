@@ -4,9 +4,9 @@ import { Tile, type Team, type World } from './types';
 export const idx = (w: number, x: number, y: number) => y * w + x;
 export const inBounds = (world: World, x: number, y: number) => x >= 0 && y >= 0 && x < world.w && y < world.h;
 
-/** Terrain only: water, deep water and mountains block, everything else can be walked. */
+/** Terrain only: water, deep water, mountains and the statue plinth block, everything else can be walked. */
 export function walkableTile(t: number): boolean {
-  return t !== Tile.Water && t !== Tile.DeepWater && t !== Tile.Mountain;
+  return t !== Tile.Water && t !== Tile.DeepWater && t !== Tile.Mountain && t !== Tile.Plinth;
 }
 
 export function isLand(t: number): boolean {

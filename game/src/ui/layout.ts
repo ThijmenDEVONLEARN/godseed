@@ -5,8 +5,8 @@
  * Verify with a phone screenshot (F4 shows the zones) and tune these numbers.
  */
 export const SCREEN = { w: 1080, h: 1920 } as const;
-export const TILE = 16;
-export const MAP_TILES = { w: 64, h: 72 } as const;
+export const TILE = 12; // 2D fallback only (?r=pixi)
+export const MAP_TILES = { w: 80, h: 90 } as const;
 
 export const ZONES = {
   tiktokTop: { y: 0, h: 130 },

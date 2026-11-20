@@ -12,6 +12,7 @@ export const COMMANDS = [
   { usage: '!burn', help: 'set an enemy building on fire' },
   { usage: '!pray', help: 'pray at the temple for faith' },
   { usage: '!me', help: 'show where you are', free: true },
+  { usage: '!help', help: 'show these commands', free: true },
   { usage: '!rename', help: 'pick a new name' },
   { usage: '!vote 1', help: 'vote for a world event', free: true },
   { usage: '!war red', help: 'chief only: declare war on a tribe', chief: true, short: 'declare war' },
@@ -21,3 +22,6 @@ export const COMMANDS = [
 ] as const;
 
 export const COMMAND_COOLDOWN_MS = 10_000;
+/** !help shows the command list on screen at most once per minute, however many viewers ask. */
+export const HELP_COOLDOWN_MS = 60_000;
+export const HELP_SHOW_MS = 12_000;

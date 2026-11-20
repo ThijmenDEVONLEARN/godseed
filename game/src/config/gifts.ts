@@ -11,13 +11,16 @@ export type GodEffect =
 /** What viewers read in the feed and the gift showcase. */
 export const EFFECT_TEXT: Record<GodEffect, string> = {
   spawnTrees: 'planted a forest', spawnSheep: 'sent a flock of sheep', spawnStone: 'raised a stone field',
-  weapon: 'forged a mighty sword', shield: 'got a holy shield', lightning: 'called lightning on',
+  weapon: 'sent sword-armed warriors against', shield: 'raised a holy shield over', lightning: 'called lightning on',
   meteor: 'dropped a METEOR on', wolfPack: 'unleashed a wolf pack on', hero: 'summoned a HERO against',
   dragon: 'sent a DRAGON to burn', tornado: 'spun a TORNADO through', plague: 'cursed with a PLAGUE',
   volcano: 'made a VOLCANO erupt', flood: 'sent a FLOOD over', goldenAge: 'started a GOLDEN AGE for',
   eclipse: 'darkened the sun: ECLIPSE', meteorShower: 'rained METEORS on the world', rainOfGold: 'made GOLD rain on everyone', titanWalk: 'awoke the TITAN',
-  rain: 'made it rain', baby: 'blessed with a baby', goldChest: 'found a gold chest for',
+  rain: 'made it rain', baby: 'blessed with a baby', goldChest: 'found a treasure chest for',
 };
+
+/** Test panel only: gift id -1 - i always plays effect i of this list. Real TikTok gift ids are positive. */
+export const TEST_EFFECTS = Object.keys(EFFECT_TEXT) as GodEffect[];
 
 export const GIFTS = {
   leaderPrice: 199,
@@ -35,5 +38,4 @@ export const GIFTS = {
   leaderGiftId: 0,
   leaderLabel: 'Become CHIEF of your team',
   likesPerRain: 100,
-  social: ['100 likes: rain', 'Follow: a baby is born', 'Share: gold chest'],
 };

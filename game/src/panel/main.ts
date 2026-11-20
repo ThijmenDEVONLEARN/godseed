@@ -1,5 +1,6 @@
 import { TEAMS } from '@godseed/shared';
 import { COMMANDS } from '../config/commands';
+import { GIFTS, TEST_EFFECTS } from '../config/gifts';
 
 const BRIDGE = new URLSearchParams(location.search).get('bridge') ?? `http://${location.hostname || 'localhost'}:8765`;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -34,6 +35,15 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('[data-social]')) b
 $('sendGift').onclick = () => {
   const sel = $<HTMLSelectElement>('gift');
   send({ type: 'gift', viewer: viewer(), giftId: Number(sel.value), giftName: sel.selectedOptions[0].text.split(' · ')[0], coins: Number(sel.value), repeat: 1 });
+};
+
+// every god effect by name: a negative gift id tells the game which one (see TEST_EFFECTS)
+const effects = $<HTMLSelectElement>('effect');
+for (const fx of TEST_EFFECTS) effects.add(new Option(fx, fx));
+$('sendEffect').onclick = () => {
+  const i = TEST_EFFECTS.indexOf(effects.value as (typeof TEST_EFFECTS)[number]);
+  const coins = GIFTS.tiers.find((t) => t.effects.includes(TEST_EFFECTS[i]))?.minCoins ?? 20;
+  send({ type: 'gift', viewer: viewer(), giftId: -1 - i, giftName: effects.value, coins, repeat: 1 });
 };
 
 // spam: N fake viewers each send a random command every 500 ms

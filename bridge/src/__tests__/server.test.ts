@@ -23,9 +23,14 @@ describe('bridge', () => {
     expect(res.status).toBe(204);
     expect((await fetch(`http://127.0.0.1:${port}/fake`, { method: 'POST', body: '{"type":"nope"}' })).status).toBe(400);
 
-    ws.send(JSON.stringify({ type: 'roundEnd', seed: 1, winner: 'red', scores: { red: 3, blue: 2, yellow: 1, green: 0 }, topPlayers: [], endedAt: 1 }));
+    ws.send(JSON.stringify({ type: 'roundEnd', seed: 1, winner: 'red', scores: { red: 3, blue: 2, yellow: 1, green: 0 }, topPlayers: [], endedAt: 1, players: [{ id: 'a', name: 'Alice', team: 'red', score: 9, kills: 3, commanded: true }] }));
+    await new Promise((r) => setTimeout(r, 100));
+    ws.send(JSON.stringify({ type: 'profileRequest', ids: ['a', 'b'] }));
     await new Promise((r) => setTimeout(r, 100));
     ws.close();
+    const profiles = got.filter((m) => m.type === 'profiles');
+    expect(profiles.at(-1)).toMatchObject({ profiles: [{ id: 'a', xp: 24, wins: 1 }] });
+    expect(got.filter((m) => m.type === 'leaderboard').at(-1)).toMatchObject({ top: [{ id: 'a' }] });
     expect(got.some((m) => m.type === 'event' && m.event.type === 'chat' && m.event.text === '!join red')).toBe(true);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toHaveLength(1);
   });

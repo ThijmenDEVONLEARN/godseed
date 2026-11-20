@@ -9,7 +9,7 @@ export function spawnUnit(world: World, team: Team, role: Role, x: number, y: nu
   const hp = role === 'hero' ? BALANCE.god.heroHp : role === 'warrior' || role === 'leader' ? BALANCE.unit.warriorHp : BALANCE.unit.workerHp;
   const u: Unit = {
     id: world.nextId++, team, role, x, y, px: x, py: y, moveStartTick: world.tick, moveTicks: 1,
-    hp, maxHp: hp, alive: true, hunger: BALANCE.hunger.max, job: { kind: 'idle' }, nextHitTick: 0, kills: 0, ...extra,
+    hp, maxHp: hp, alive: true, hunger: BALANCE.hunger.max, job: { kind: 'idle' }, nextHitTick: 0, kills: 0, work: 0, ...extra,
   };
   world.units.push(u);
   return u;

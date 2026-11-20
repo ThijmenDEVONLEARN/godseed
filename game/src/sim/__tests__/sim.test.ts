@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../config/balance';
 import { hashValue } from '../hash';
 import { createSimulation } from '../Simulation';
-import { newRound } from '../systems/round';
+import { walkableTile } from '../grid';
+import { newRound, viewerScore } from '../systems/round';
 
 const run = (seed: number, ticks: number) => {
   const sim = createSimulation(seed);
@@ -22,6 +23,11 @@ describe('simulation', () => {
     }
     expect(w.units.filter((u) => u.alive).length, 'total pop').toBeGreaterThanOrEqual(TEAMS.length * BALANCE.npcMin);
     expect(kinds.raid ?? 0).toBeGreaterThan(0);
+  });
+
+  it('a villager does not keep chasing a sheep it cannot reach', () => {
+    // Seed 7 has sheep across the water; one retry per tick gave 900+ of these in 1000 ticks.
+    expect(run(7, 1000).kinds.noPath ?? 0).toBeLessThan(30);
   });
 
   it('is deterministic for the same seed and commands', () => {
@@ -76,5 +82,34 @@ describe('viewer units', () => {
     const u = sim.world.units.find((x) => x.viewerId === 'w')!;
     expect(u.job.kind).not.toBe('idle');
     expect(u.x !== sim.world.teams.green.homeX || u.y !== sim.world.teams.green.homeY).toBe(true);
+  });
+
+  it('earn work points, twice as fast when they ordered the work', () => {
+    const sim = createSimulation(5);
+    for (const id of ['lazy', 'busy']) sim.enqueue({ kind: 'join', viewerId: id, name: id, team: 'green' });
+    sim.step();
+    sim.enqueue({ kind: 'order', viewerId: 'busy', order: 'farm' });
+    for (let i = 0; i < 3000; i++) sim.step();
+    const [lazy, busy] = ['lazy', 'busy'].map((id) => sim.world.units.find((u) => u.viewerId === id)!);
+    expect(busy.work).toBeGreaterThanOrEqual(100);
+    expect(busy.work).toBeGreaterThan(lazy.work);
+    expect(viewerScore(busy)).toBe(3 * busy.kills + Math.floor(busy.work / 100) + (busy.alive ? 2 : 0));
+  });
+
+  it('puts up a statue of the best viewer in the next world, on tiles nobody can walk', () => {
+    const sim = createSimulation(3);
+    for (const [id, name] of [['a', 'Ann'], ['b', 'Bob']]) sim.enqueue({ kind: 'join', viewerId: id, name, team: 'red' });
+    sim.step();
+    sim.world.units.find((u) => u.viewerId === 'b')!.kills = 4;
+    sim.world.round.phase = 'storm';
+    sim.world.round.phaseUntil = sim.world.tick + 1;
+    sim.step(); sim.step();
+    expect(sim.world.round.mvp).toMatchObject({ viewerId: 'b', name: 'Bob', team: 'red' });
+    newRound(sim.world);
+    const st = sim.world.statue!;
+    expect(st).toMatchObject({ viewerId: 'b', name: 'Bob' });
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) expect(walkableTile(sim.world.tiles[(st.y + dy) * sim.world.w + st.x + dx])).toBe(false);
+    newRound(sim.world);
+    expect(sim.world.statue).toBeUndefined(); // nobody played that round
   });
 });
