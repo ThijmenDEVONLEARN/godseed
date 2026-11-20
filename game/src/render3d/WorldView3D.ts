@@ -21,7 +21,7 @@ const SKY = { day: 0xa9d6f0, rain: 0x7d8a98, storm: 0x4a3436, eclipse: 0x18213a 
 /** Villagers are small next to a one-tile hut; chiefs and heroes stand out by size. */
 const unitScale = (u: Unit) => (u.role === 'hero' ? 1.15 : u.role === 'leader' ? 0.85 : 0.62);
 /** The overview may use nearly the whole view; the HUD sits outside the 3D view for now. */
-const WIDE = { x: 0.94, y0: -0.94, y1: 0.94 };
+const WIDE = { x: 0.985, y0: -0.985, y1: 0.985 };
 const LOAD: Record<Resource, number> = { wood: 0x8a5a2b, stone: 0x9aa0aa, food: 0xe2c044, gold: 0xffcf3a, iron: 0x7f8fa6 };
 /** Head of each tool at the end of the handle: size and colour. The sword turns the handle into the blade. */
 const TOOL_HEAD: Record<Tool, { size: [number, number, number]; z: number; color: number }> = {
@@ -688,9 +688,9 @@ export class WorldView3D {
   camera(world: World, c: CameraTarget, focus: { x: number; y: number; zoomed: boolean; track?: Track }, dtMs: number): void {
     if (!this.terrain) return;
     const t = performance.now() / 1000, dt = Math.min(0.1, dtMs / 1000), k = Math.min(1, Math.max(0, (c.zoom - 1) / 1.1));
-    // overview: the island just fills the view. The guard only backs off, so start too close and let it stop at the first fit.
+    // overview: the island just fills the view, seen steeply (about 67°) so its length uses the height of the view too. The guard only backs off, so start too close and let it stop at the first fit.
     const mid = centre(this.coast);
-    let over = guard({ p: [mid[0] + Math.sin(t * 0.045) * 2, 12, mid[2] + 9], l: [mid[0], 0, mid[2]] }, this.coast, this.lens, WIDE);
+    let over = guard({ p: [mid[0] + Math.sin(t * 0.045) * 2, 14, mid[2] + 6], l: [mid[0], 0, mid[2]] }, this.coast, this.lens, WIDE);
     // the guard backs off in coarse steps; creep back in until the coast touches the edge
     for (let i = 0; i < 12; i++) {
       const nearer: Shot = { l: over.l, p: mix(over.p, over.l, 0.015) };
