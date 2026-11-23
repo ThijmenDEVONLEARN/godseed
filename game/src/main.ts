@@ -1,6 +1,7 @@
 import { TEAMS, roundXp, type RoundEnd } from '@godseed/shared';
 import { BALANCE } from './config/balance';
 import { createCommandRouter } from './commands';
+import { createSfx } from './audio/sfx';
 import { createBridgeClient } from './net/BridgeClient';
 import { createCamera } from './render/Camera';
 import { PALETTE } from './render/palette';
@@ -27,6 +28,8 @@ const view = params.get('r') === 'pixi'
   ? await (await import('./render/pixiView')).createPixiView(stage)
   : await (await import('./render3d/view3d')).create3DView(stage, ZONES.map.y, ZONES.bottom.y - 8 - ZONES.map.y);
 const camera = createCamera(MAP_TILES.w, MAP_TILES.h);
+// game sounds made in the browser; ?sfx=off silences them
+if ('fx' in view && params.get('sfx') !== 'off') { const sfx = createSfx(); view.fx.onSound = sfx.play; }
 
 const hud = createHud(ui);
 const debug = createDebug(ui);

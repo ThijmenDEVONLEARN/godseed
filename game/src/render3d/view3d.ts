@@ -19,6 +19,6 @@ export async function create3DView(stage: HTMLElement, top: number, height: numb
     setCosmetic: (viewerId: string, cos: Cosmetic) => view.setCosmetic(viewerId, cos),
     camera: (world: World, c: CameraTarget, focus: { x: number; y: number; zoomed: boolean; track?: Track }, dtMs: number) => view.camera(world, c, focus, dtMs),
     render: () => view.render(),
-    info: () => `fit ${view.fitNow.toFixed(2)}`,
+    info: () => `fit ${view.fitNow.toFixed(2)} · ${view.drawInfo}`,
   };
 }

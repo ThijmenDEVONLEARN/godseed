@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-/** Sound hooks: the view calls these at the right moment, the sounds themselves come later (R7). */
+/** Sound hooks: the view calls these at the right moment; `audio/sfx.ts` plays them. */
 export type Sfx =
   | 'pop' | 'rumble' | 'zing' | 'hum' | 'thunder' | 'whistle' | 'boom' | 'howl' | 'land' | 'roar' | 'wind'
   | 'cough' | 'eruption' | 'wave' | 'harp' | 'drone' | 'coins' | 'stomp' | 'chime' | 'hit' | 'crash' | 'fanfare';

@@ -56,6 +56,8 @@ export class WorldView3D {
   /** How well the current subject fits the safe frame (<= 1 is good), for the debug box and tests. */
   fitNow = 0;
   private renderer: THREE.WebGLRenderer;
+  /** Draw calls and triangles of the last frame, for the debug line. */
+  drawInfo = '';
   private scene = new THREE.Scene();
   private cam = new THREE.PerspectiveCamera(FOV, SCREEN.w / SCREEN.h, 0.3, 600);
   private sun = new THREE.DirectionalLight(0xfff0d4, 1.9);
@@ -563,7 +565,7 @@ export class WorldView3D {
     const raining = world.tick < world.rainUntil, storm = world.round.phase === 'storm';
     this.sky.lerp(this.c.set(dark > 0.05 ? SKY.eclipse : storm ? SKY.storm : raining ? SKY.rain : SKY.day), 0.04);
     (this.scene.fog as THREE.Fog).color.copy(this.sky);
-    const flash = this.fx.flash;
+    const flash = this.fx.flash * (REDUCED_MOTION ? 0.25 : 1); // reduced motion: a soft glow instead of a white flash
     this.sun.intensity = (storm ? 0.7 : raining ? 0.9 : 1.9) * (1 - dark * 0.92) + flash * 3;
     this.hemi.intensity = (storm ? 0.75 : 1.1) * (1 - dark * 0.7) + flash;
     const p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
@@ -751,6 +753,7 @@ export class WorldView3D {
     this.lastRender = ms;
     this.fx.update(this.frameDt);
     this.renderer.render(this.scene, this.cam);
+    this.drawInfo = `${this.renderer.info.render.calls} calls · ${Math.round(this.renderer.info.render.triangles / 1000)}k tris`;
   }
 }
 
