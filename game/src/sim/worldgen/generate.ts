@@ -5,12 +5,12 @@ import { idx, isLand, walkableTile, NEIGHBORS } from '../grid';
 import { createNoise } from './noise';
 import { Deposit, Tile, type TeamState, type World } from '../types';
 
-export const START_QUADRANT: Record<Team, { x0: number; x1: number; y0: number; y1: number }> = {
-  red: { x0: 10, x1: 18, y0: 10, y1: 22 },
-  blue: { x0: 46, x1: 54, y0: 10, y1: 22 },
-  yellow: { x0: 10, x1: 18, y0: 50, y1: 62 },
-  green: { x0: 46, x1: 54, y0: 50, y1: 62 },
-};
+/** Start areas as a share of the map, so they sit in the four corners at any map size. */
+const QUAD = { x: [[0.16, 0.28], [0.72, 0.84]], y: [[0.14, 0.3], [0.7, 0.86]] };
+export function startQuadrant(team: Team, w: number, h: number): { x0: number; x1: number; y0: number; y1: number } {
+  const [x0, x1] = QUAD.x[team === 'red' || team === 'yellow' ? 0 : 1], [y0, y1] = QUAD.y[team === 'red' || team === 'blue' ? 0 : 1];
+  return { x0: Math.round(x0 * w), x1: Math.round(x1 * w), y0: Math.round(y0 * h), y1: Math.round(y1 * h) };
+}
 
 export interface Terrain {
   seed: number;
@@ -56,7 +56,7 @@ function tryGenerate(seed: number, w: number, h: number): Terrain | null {
   // 3. start spots: the most land-rich spot in each quadrant, then cleared to grass
   const homes = {} as Record<Team, { x: number; y: number }>;
   for (const team of TEAMS) {
-    const q = START_QUADRANT[team];
+    const q = startQuadrant(team, w, h);
     let best = { x: q.x0, y: q.y0, s: -1 };
     for (let y = q.y0; y <= q.y1; y++) for (let x = q.x0; x <= q.x1; x++) {
       let s = 0;

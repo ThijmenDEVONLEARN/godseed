@@ -49,7 +49,7 @@ export function applyCommand(world: World, cmd: SimCommand): void {
       }
       const placed = placeBuilding(world, u.team, cmd.building);
       if (!placed.length) { info(world, `${u.name}: no room for a ${cmd.building}`, u.team); return; }
-      u.job = { kind: 'build', targetId: placed[0].id };
+      u.job = { kind: 'build', targetId: placed[0].id, ordered: true };
       u.path = undefined;
       return;
     }
@@ -113,7 +113,7 @@ function join(world: World, viewerId: string, name: string, wanted?: Team): void
   if (mine) world.units.splice(world.units.indexOf(mine), 1);
   const t = world.teams[team];
   const u = spawnUnit(world, team, 'viewer', t.homeX, t.homeY, { viewerId, name });
-  emit(world, { kind: 'join', team, x: t.homeX, y: t.homeY, unitId: u.id, text: `${name} joined ${team}` });
+  emit(world, { kind: 'join', team, x: t.homeX, y: t.homeY, unitId: u.id, viewerId: u.viewerId, text: `${name} joined ${team}` });
 }
 
 const TAX_COOLDOWN_TICKS = 1200; // 2 min

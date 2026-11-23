@@ -6,6 +6,8 @@
     "dev": "tsx watch --env-file-if-exists=../.env src/main.ts",
     "start": "tsx --env-file-if-exists=../.env src/main.ts",
     "clear-highscores": "tsx src/clear-highscores.ts",
+    "remove-player": "tsx src/remove-player.ts",
+    "clear-players": "tsx src/clear-players.ts",
     "test": "vitest run --passWithNoTests",
     "build": "tsc --noEmit -p ."
   },

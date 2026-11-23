@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Godseed model catalogue</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+      body { margin: 0; background: #10141c; color: #eef; font: 16px system-ui, sans-serif; }
+      nav { position: fixed; z-index: 2; top: 8px; left: 8px; display: flex; gap: 6px; }
+      nav a { padding: 6px 12px; border-radius: 6px; background: #1a2233; color: #eef; text-decoration: none; border: 1px solid #ffffff33; }
+      nav a[aria-current] { background: #ffe066; color: #111; }
+      #stage { position: relative; width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; }
+      #legend { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; padding: 14px 20px; background: #10141ccc; font: 26px 'Pixelify Sans', monospace; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <nav id="nav"></nav>
+    <div id="stage"><div id="legend"></div></div>
+    <script type="module" src="/src/catalog.ts"></script>
+  </body>
+</html>

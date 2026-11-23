@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import type { BridgeMessage, GameMessage, ViewerEvent } from '@godseed/shared';
+import { TEAMS, type BridgeMessage, type GameMessage, type ViewerEvent } from '@godseed/shared';
+import { join, dirname } from 'node:path';
+import { createPlayers } from './players';
 import { createStore } from './store';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -28,6 +30,7 @@ export function parseFake(body: unknown): ViewerEvent | null {
 /** WebSocket hub for the game plus `POST /fake` for the test panel. TikTok events come in through `publish`. */
 export function createBridge(port: number, dataFile: string) {
   const store = createStore(dataFile);
+  const players = createPlayers(join(dirname(dataFile), 'players.json'));
   const clients = new Set<WebSocket>();
   const send = (ws: WebSocket, m: BridgeMessage) => ws.send(JSON.stringify(m));
   // a game that (re)connects learns the last known TikTok state, not a stale "fake: up"
@@ -62,13 +65,20 @@ export function createBridge(port: number, dataFile: string) {
     clients.add(ws);
     send(ws, { type: 'event', event: status });
     send(ws, { type: 'highscores', rounds: store.rounds() });
+    send(ws, { type: 'leaderboard', top: players.top() });
     ws.on('close', () => clients.delete(ws));
     ws.on('message', (data) => {
       let m: GameMessage;
       try { m = JSON.parse(String(data)) as GameMessage; } catch { return; }
+      if (m.type === 'profileRequest') send(ws, { type: 'profiles', profiles: players.get(m.ids) });
       if (m.type === 'roundEnd') {
-        store.add(m);
-        for (const c of clients) send(c, { type: 'highscores', rounds: store.rounds() });
+        const updated = TEAMS.includes(m.winner) ? players.applyRound(m.players, m.winner) : [];
+        store.add({ ...m, players: undefined });
+        for (const c of clients) {
+          send(c, { type: 'highscores', rounds: store.rounds() });
+          send(c, { type: 'profiles', profiles: updated });
+          send(c, { type: 'leaderboard', top: players.top() });
+        }
       }
     });
   });

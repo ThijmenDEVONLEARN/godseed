@@ -76,7 +76,7 @@ export function startGather(world: World, u: Unit, res: Resource): void {
       u.job = { kind: 'gather', res, stage: 'go', tx, ty, workLeft: BALANCE.gather.workTicks.food };
       return;
     }
-    const sheep = nearestSheep(world, u);
+    const sheep = world.tick >= (u.noHuntUntil ?? 0) ? nearestSheep(world, u) : undefined;
     if (sheep) { u.job = { kind: 'hunt', targetId: sheep.id, stage: 'go' }; return; }
     res = 'wood';
   }
@@ -92,9 +92,12 @@ function nearestSheep(world: World, u: Unit) {
   return best;
 }
 
+/** Work in hundredths of a point: a viewer's own order (!farm, !chop, !mine, !build) counts in full, work the villager picked itself half. */
+const workPoints = (u: Unit) => (u.order || (u.job.kind === 'build' && u.job.ordered) ? 100 : 50);
+
 function deliver(world: World, u: Unit): void {
   const golden = world.effects.some((e) => e.kind === 'goldenAge' && e.team === u.team);
-  if (u.carrying) world.teams[u.team].stock[u.carrying.res] += u.carrying.amount * (golden ? 2 : 1);
+  if (u.carrying) { world.teams[u.team].stock[u.carrying.res] += u.carrying.amount * (golden ? 2 : 1); u.work += workPoints(u) / 5; } // a load every few seconds, so 1 point per 5
   u.carrying = undefined;
   u.job = { kind: 'idle' };
 }
@@ -143,6 +146,8 @@ export function jobs(world: World, walls: Map<number, Team>): void {
           } else if (arrived(u) || (world.tick % 20 === u.id % 20)) {
             u.path = undefined;
             goTo(world, u, sheep.y * world.w + sheep.x, walls);
+            // Without this the villager picks the same unreachable sheep again every tick.
+            if (u.job.kind === 'idle') u.noHuntUntil = world.tick + BALANCE.huntRetryTicks;
           }
         } else if (goTo(world, u, homeIdx(world, u.team), walls)) deliver(world, u);
         break;
@@ -153,6 +158,7 @@ export function jobs(world: World, walls: Map<number, Team>): void {
         if (dist(u, b) <= 1) {
           u.path = undefined;
           b.progress = Math.min(1, b.progress + BALANCE.buildRatePerTick);
+          u.work += Math.round(BALANCE.buildRatePerTick * 2 * workPoints(u));
           if (b.progress >= 1) completeBuilding(world, b);
         } else if (!u.path) {
           const goal = buildSpot(world, b);

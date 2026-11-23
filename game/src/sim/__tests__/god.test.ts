@@ -1,6 +1,7 @@
 import { TEAMS } from '@godseed/shared';
 import { describe, expect, it } from 'vitest';
-import { GIFTS, type GodEffect } from '../../config/gifts';
+import { BALANCE } from '../../config/balance';
+import { GIFTS, TEST_EFFECTS, type GodEffect } from '../../config/gifts';
 import { reachable } from '../worldgen/generate';
 import { applyGod, giftEffect } from '../god';
 import { createSimulation } from '../Simulation';
@@ -40,14 +41,38 @@ describe('god effects', () => {
     });
   }
 
-  it('meteor wrecks the strongest enemy village', () => {
+  it('meteor wrecks the strongest enemy village, after a moment to see it coming', () => {
     const sim = grown();
     const w = sim.world;
     w.teams.blue.score = 999;
-    const hpBefore = w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
+    const hp = () => w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
+    const hpBefore = hp();
     applyGod(w, 'meteor', 'red', 'Gina');
-    const hpAfter = w.buildings.filter((b) => b.alive && b.team === 'blue').reduce((s, b) => s + b.hp, 0);
-    expect(hpAfter).toBeLessThan(hpBefore);
+    expect(hp()).toBe(hpBefore);
+    const god = w.events.find((e) => e.kind === 'god');
+    expect(god?.god).toBe('meteor');
+    expect(god?.spots).toHaveLength(1);
+    for (let i = 0; i < BALANCE.god.meteorFallTicks; i++) sim.step();
+    expect(hp()).toBeLessThan(hpBefore);
+  });
+
+  it('the test panel can pick any effect with a negative gift id', () => {
+    const w = grown().world;
+    TEST_EFFECTS.forEach((e, i) => expect(giftEffect(w, 1, -1 - i)).toBe(e));
+  });
+
+  it('the big gifts hurt the leading tribe and spare the giver', () => {
+    // against the same world without the gift, since tribes rebuild while the effect plays out
+    const hp = (w: ReturnType<typeof grown>['world'], t: string) => w.buildings.filter((b) => b.alive && b.team === t).reduce((s, b) => s + b.hp, 0);
+    for (const effect of ['volcano', 'flood', 'meteorShower', 'titanWalk'] as const) {
+      const [a, b] = [grown(), grown()];
+      for (const s of [a, b]) s.world.teams.blue.score = 999;
+      applyGod(b.world, effect, 'red', 'Gina');
+      // the titan needs time to walk over; the rest strike at once, before the two worlds drift apart
+      for (let i = 0; i < (effect === 'titanWalk' ? 700 : 60); i++) { a.step(); b.step(); }
+      expect(hp(b.world, 'blue'), `${effect} hits blue`).toBeLessThan(hp(a.world, 'blue'));
+      if (effect !== 'volcano') expect(hp(b.world, 'red'), `${effect} spares red`).toBeGreaterThanOrEqual(hp(a.world, 'red') * 0.9);
+    }
   });
 
   it('hero fights for the giver and leaves after its time', () => {
